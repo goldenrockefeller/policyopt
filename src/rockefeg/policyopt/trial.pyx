@@ -22,7 +22,9 @@ ScoreEntry = (
 
 @cython.warn.undeclared(True)
 cdef class Trial:
-    def __init__(self, args):
+    def __init__(self, dict args):
+        cdef object log_parent_dirname
+        
         self.system = <BaseSystem?>args["system"] 
         self.domain = <BaseDomain?>args["domain"] 
         self.experiment_name = args["experiment_name"]
@@ -57,6 +59,8 @@ cdef class Trial:
         
     cpdef void save(self) except *:
         cdef object save_filename
+        cdef object exc
+        cdef object save_file
         
         save_filename = (
             os.path.join(
@@ -76,11 +80,12 @@ cdef class Trial:
             pickle.dump(self, save_file) 
     
     @staticmethod        
-    def object load(object save_filename):
+    def load(object save_filename):
         cdef object trial
+        cdef object save_file
         
         with open(save_filename, 'rb') as save_file:
-            trial = pickle.load(self, save_file) 
+            trial = pickle.load(save_file) 
             
         return trial
         
@@ -98,7 +103,13 @@ cdef class Trial:
         
     cpdef void log_score_history(self) except *:
         cdef object save_filename
-        cdef Py_ssize_t
+        cdef Py_ssize_t entry_id
+        cdef object exc
+        cdef object save_file
+        cdef object writer
+        cdef list data
+        
+        entry_id = 0
         
         save_filename = (
             os.path.join(
@@ -113,38 +124,29 @@ cdef class Trial:
             except OSError as exc: # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-                    
+        
+        data = [0] * len(self.score_history)
         with open(save_filename, 'w', newline='') as save_file:
             writer = csv.writer(save_file)
-            writer.writerow(
-                ['score'] 
-                + [
-                self.score_history[entry_id].score
-                for entry_id 
-                in range(len(self.score_history))
-                ])
-            writer.writerow(
-                ['n_generations_elapsed'] 
-                + [
-                self.score_history[entry_id].n_generations_elapsed
-                for entry_id 
-                in range(len(self.score_history))
-                ])
-            writer.writerow(
-                ['n_training_episodes_elapsed'] 
-                + [
-                self.score_history[entry_id].n_training_episodes_elapsed
-                for entry_id 
-                in range(len(self.score_history))
-                ])
-            writer.writerow(
-                ['n_training_steps_elapsed'] 
-                + [
-                self.score_history[entry_id].n_training_steps_elapsed
-                for entry_id 
-                in range(len(self.score_history))
-                ])
             
+            for entry_id in range(len(self.score_history)):
+                data[entry_id] = self.score_history[entry_id].score
+            writer.writerow(['score'] + data)
+            
+            for entry_id in range(len(self.score_history)):
+                data[entry_id] = (
+                    self.score_history[entry_id].n_generations_elapsed)
+            writer.writerow(['n_generations_elapsed'] + data)
+            
+            for entry_id in range(len(self.score_history)):
+                data[entry_id] = (
+                    self.score_history[entry_id].n_training_episodes_elapsed)
+            writer.writerow(['n_training_episodes_elapsed'] + data)
+            
+            for entry_id in range(len(self.score_history)):
+                data[entry_id] = (
+                    self.score_history[entry_id].n_training_steps_elapsed)
+            writer.writerow(['n_training_steps_elapsed'] + data)
 
             
     cpdef void run(self) except *:
@@ -210,7 +212,7 @@ cdef class Trial:
                         self.n_training_episodes_elapsed),
                     n_training_steps_elapsed = self.n_training_steps_elapsed))
             
-            if prints_score:
+            if self.prints_score:
                 # Print last score entry.
                 print(self.score_history[-1])
                 
