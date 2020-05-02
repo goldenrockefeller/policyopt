@@ -1,6 +1,12 @@
 from .system cimport BaseSystem
 from .domain cimport BaseDomain
 
+cdef class ScoreEntry:
+    cdef public double score
+    cdef public Py_ssize_t n_generations_elapsed
+    cdef public Py_ssize_t n_training_episodes_elapsed
+    cdef public Py_ssize_t n_training_steps_elapsed
+
 cdef class Trial:
     cdef public BaseSystem system
     cdef public BaseDomain domain
@@ -8,7 +14,7 @@ cdef class Trial:
     cdef public object mod_name
     cdef public bint prints_score
     cdef public bint deletes_final_save_file
-    cdef public object save_period
+    cdef public double save_period
     cdef public Py_ssize_t n_training_episodes_elapsed
     cdef public Py_ssize_t n_generations_elapsed
     cdef public Py_ssize_t n_training_steps_elapsed

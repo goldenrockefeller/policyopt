@@ -1,4 +1,5 @@
 cimport cython
+from libc.time cimport time_t, time, difftime
 
 import datetime as dt
 import os
@@ -9,21 +10,25 @@ from collections import namedtuple
 
 
 
-ScoreEntry = (
-    namedtuple(
-        "ScoreEntry", 
-        [
-        "score",
-        "n_generations_elapsed",
-        "n_training_episodes_elapsed",
-        "n_training_steps_elapsed"
-        ]))
+cdef ScoreEntry new_ScoreEntry():
+    ScoreEntry entry
+    
+    entry = ScoreEntry.__new__(ScoreEntry)
+    
+    return entry
+        
+@cython.warn.undeclared(True)
+@cython.auto_pickle(True)
+cdef class ScoreEntry:
+    pass
 
 
 @cython.warn.undeclared(True)
+@cython.auto_pickle(True)
 cdef class Trial:
     def __init__(self, dict args):
         cdef object log_parent_dirname
+        cdef object py_save_period
         
         self.system = <BaseSystem?>args["system"] 
         self.domain = <BaseDomain?>args["domain"] 
@@ -36,8 +41,10 @@ cdef class Trial:
             args.get("deletes_final_save_file", default = True))
         
         # Save period in seconds. 
-        self.save_period = (
+        py_save_period = (
             args.get("save_period", default = dt.timedelta(minutes = 10)))
+        self.save_period = py_save_period.total_seconds()
+            
             
         self.n_training_episodes_elapsed = 0
         self.n_generations_elapsed = 0
@@ -156,12 +163,14 @@ cdef class Trial:
         cdef object observations
         cdef object actions
         cdef object feedback
-        cdef object last_save_datetime
-        
+        cdef ScoreEntry score_entry
+        cdef time_t current_time
+        cdef time_t last_save_time
         system = self.system
         domain = self.domain
         
-        last_save_datetime = None
+        self.save()
+        time(&last_save_time)
         
         while not system.is_done_training():
 
@@ -204,24 +213,31 @@ cdef class Trial:
             
             self.n_generations_elapsed += 1
             
-            self.score_history.append(
-                ScoreEntry(
-                    score = score,
-                    n_generations_elapsed = self.n_generations_elapsed,
-                    n_training_episodes_elapsed = (
-                        self.n_training_episodes_elapsed),
-                    n_training_steps_elapsed = self.n_training_steps_elapsed))
+            score_entry = new_ScoreEntry()
+            score_entry.score = score
+            score_entry.n_generations_elapsed = self.n_generations_elapsed
+            score_entry.n_training_episodes_elapsed = (
+                self.n_training_episodes_elapsed)
+            score_entry.n_training_steps_elapsed = self.n_training_steps_elapsed
             
+            self.score_history.append(score_entry)
+                
             if self.prints_score:
                 # Print last score entry.
-                print(self.score_history[-1])
-                
-            if last_save_datetime is None:
+                print(
+                    "score: {score_entry.score}, "
+                    "n_generations_elapsed: "
+                    "{score_entry.n_generations_elapsed}, "
+                    "n_training_episodes_elapsed: "
+                    "{score_entry.n_training_episodes_elapsed}, "
+                    "n_training_steps_elapsed: "
+                    "{score_entry.n_training_steps_elapsed}"
+                    .format(**locals()))
+            
+            time(&current_time)
+            if difftime(current_time, last_save_time) > self.save_period:
                 self.save()
-                last_save_datetime = dt.datetime.now()
-            elif dt.datetime.now() - last_save_datetime > self.save_period:
-                self.save()
-                last_save_datetime = dt.datetime.now()
+                time(&last_save_time)
         
 
         self.log_score_history()
