@@ -1,0 +1,12 @@
+from Cython.Build import cythonize
+
+def make_ext(modname, pyxfilename):
+    exts = (
+        cythonize(
+            pyxfilename,
+            language_level = 3))
+    return exts[0]
+
+# import numpy
+# def make_setup_args():
+#     return dict(include_dirs=[numpy.get_include()])

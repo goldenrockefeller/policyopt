@@ -1,5 +1,4 @@
 cimport cython
-from libc.time cimport time_t, time, difftime
 
 import datetime as dt
 import os
@@ -9,47 +8,39 @@ import pickle
 from collections import namedtuple
 
 
-        
-@cython.warn.undeclared(True)
-@cython.auto_pickle(True)
-cdef class ScoreEntry:
-    pass
+
+ScoreEntry = (
+    namedtuple(
+        "ScoreEntry", 
+        [
+        "score",
+        "n_generations_elapsed",
+        "n_training_episodes_elapsed",
+        "n_training_steps_elapsed"
+        ]))
+
 
 @cython.warn.undeclared(True)
-cdef ScoreEntry new_ScoreEntry():
-    cdef ScoreEntry entry
-    
-    entry = ScoreEntry.__new__(ScoreEntry)
-    
-    return entry
-
-@cython.warn.undeclared(True)
-@cython.auto_pickle(True)
 cdef class Trial:
     def __init__(self, dict args):
         cdef object log_parent_dirname
-        cdef object py_save_period
         
         self.system = <BaseSystem?>args["system"] 
         self.domain = <BaseDomain?>args["domain"] 
         self.experiment_name = args["experiment_name"]
         self.mod_name = args["mod_name"]
         
-        self.prints_score = args.get("prints_score", False)
-        log_parent_dirname = ( 
-            args.get(
-                "log_parent_dirname", 
-                "log"))
+        self.prints_score = args.get("prints_score", default = False)
+        log_parent_dirname = args.get("log_parent_dirname", default = "log")
         self.deletes_final_save_file = (
-            args.get("deletes_final_save_file", True))
+            args.get("deletes_final_save_file", default = True))
         
         # Save period in seconds. 
-        py_save_period = args.get("save_period",  dt.timedelta(minutes = 10))
-        self.save_period = py_save_period.total_seconds()
-            
+        self.save_period = (
+            args.get("save_period", default = dt.timedelta(minutes = 10)))
             
         self.n_training_episodes_elapsed = 0
-        self.n_epochs_elapsed = 0
+        self.n_generations_elapsed = 0
         self.n_training_steps_elapsed = 0
         self.datetime_str = (
             dt.datetime.now().isoformat()
@@ -105,7 +96,7 @@ cdef class Trial:
             os.path.join(
                 self.log_dirname, 
                 "save",
-                "trail_save_{self.datetime_str}.pickle".format(**locals())))
+                "save_{self.datetime_str}.pickle".format(**locals())))
         
         if os.path.exists(save_filename):    
             os.remove(save_filename) 
@@ -144,8 +135,8 @@ cdef class Trial:
             
             for entry_id in range(len(self.score_history)):
                 data[entry_id] = (
-                    self.score_history[entry_id].n_epochs_elapsed)
-            writer.writerow(['n_epochs_elapsed'] + data)
+                    self.score_history[entry_id].n_generations_elapsed)
+            writer.writerow(['n_generations_elapsed'] + data)
             
             for entry_id in range(len(self.score_history)):
                 data[entry_id] = (
@@ -162,34 +153,31 @@ cdef class Trial:
         cdef BaseSystem system
         cdef BaseDomain domain
         cdef double score
-        cdef object observation
-        cdef object action
+        cdef object observations
+        cdef object actions
         cdef object feedback
-        cdef ScoreEntry score_entry
-        cdef time_t current_time
-        cdef time_t last_save_time
+        cdef object last_save_datetime
         
         system = self.system
         domain = self.domain
         
-        self.save()
-        time(&last_save_time)
+        last_save_datetime = None
         
         while not system.is_done_training():
 
-            system.prep_for_epoch()
-            domain.prep_for_epoch()
+            system.prep_for_generation()
+            domain.prep_for_generation()
             
-            while not system.is_ready_for_evaluation():
+            while not system.is_ready_for_evalution():
                 
                 domain.reset_for_training()
                 
                 # Run the domain.
                 while not domain.episode_is_done():
-                    observation = domain.observation()
-                    action = system.action(observation)
+                    observations = domain.observations()
+                    actions = system.actions(observations)
                     
-                    domain.step(action)
+                    domain.step(actions)
                     
                     feedback = domain.feedback()
                     system.receive_feedback(feedback)
@@ -199,48 +187,41 @@ cdef class Trial:
                 system.update_policy()
                 self.n_training_episodes_elapsed += 1
                 
-            # End training; Begin evaluation.
+            # End training; Begin evalution.
             domain.reset_for_evaluation()
     
             # Run the domain.
             while not domain.episode_is_done():
-                observation = domain.observation()
-                action = system.action(observation)
+                observations = domain.observations()
+                actions = system.actions(observations)
                 
-                domain.step(action)
+                domain.step(actions)
                     
             score = domain.score()
             system.receive_score(score)
             
-            # End of evaluation.
+            # End of evalution.
             
-            self.n_epochs_elapsed += 1
+            self.n_generations_elapsed += 1
             
-            score_entry = new_ScoreEntry()
-            score_entry.score = score
-            score_entry.n_epochs_elapsed = self.n_epochs_elapsed
-            score_entry.n_training_episodes_elapsed = (
-                self.n_training_episodes_elapsed)
-            score_entry.n_training_steps_elapsed = self.n_training_steps_elapsed
+            self.score_history.append(
+                ScoreEntry(
+                    score = score,
+                    n_generations_elapsed = self.n_generations_elapsed,
+                    n_training_episodes_elapsed = (
+                        self.n_training_episodes_elapsed),
+                    n_training_steps_elapsed = self.n_training_steps_elapsed))
             
-            self.score_history.append(score_entry)
-                
             if self.prints_score:
                 # Print last score entry.
-                print(
-                    "score: {score_entry.score}\n"
-                    "n_epochs_elapsed: "
-                    "{score_entry.n_epochs_elapsed}\n "
-                    "n_training_episodes_elapsed: "
-                    "{score_entry.n_training_episodes_elapsed}\n"
-                    "n_training_steps_elapsed: "
-                    "{score_entry.n_training_steps_elapsed}\n"
-                    .format(**locals()))
-            
-            time(&current_time)
-            if difftime(current_time, last_save_time) > self.save_period:
+                print(self.score_history[-1])
+                
+            if last_save_datetime is None:
                 self.save()
-                time(&last_save_time)
+                last_save_datetime = dt.datetime.now()
+            elif dt.datetime.now() - last_save_datetime > self.save_period:
+                self.save()
+                last_save_datetime = dt.datetime.now()
         
 
         self.log_score_history()
