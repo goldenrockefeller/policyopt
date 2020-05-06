@@ -69,10 +69,28 @@ cdef class BaseEvolvingSystem(BaseSystem):
     cpdef list phenotypes_deep_copy(self)
     cpdef void set_phenotypes(self, list phenotypes) except *
 
+    cpdef Py_ssize_t n_unevaluated_phenotypes(self) except *
+    cpdef void _append_unevaluated_phenotype(
+        self,
+        unevaluated_phenotype
+        ) except *
+    cpdef _pop_unevaluated_phenotype(self, Py_ssize_t index)
+    cpdef void _insert_unevaluated_phenotype(
+        self,
+        Py_ssize_t index,
+        unevaluated_phenotype
+        ) except *
+    cpdef _unevaluated_phenotype(self, Py_ssize_t index)
+    cpdef unevaluated_phenotype_copy(self, Py_ssize_t index)
+    cpdef void _set_unevaluated_phenotype(
+        self,
+        Py_ssize_t index,
+        unevaluated_phenotype
+        ) except *
     cpdef list _unevaluated_phenotypes(self)
-    cpdef list unevaluated_phenotypes_shallow_copy(self)
+    cpdef list _unevaluated_phenotypes_shallow_copy(self)
     cpdef list unevaluated_phenotypes_deep_copy(self)
-    cpdef void set_unevaluated_phenotypes(
+    cpdef void _set_unevaluated_phenotypes(
         self,
         list unevaluated_phenotypes
         ) except *
@@ -98,4 +116,4 @@ cdef class DefaultEvolvingSystem(BaseEvolvingSystem):
 
 
 cdef DefaultEvolvingSystem new_DefaultEvolvingSystem()
-cdef void init_DefaultEvolvingSystem(DefaultEvolvingSystem xxx) except *
+cdef void init_DefaultEvolvingSystem(DefaultEvolvingSystem system) except *
