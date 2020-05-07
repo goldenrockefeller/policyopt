@@ -61,8 +61,7 @@ cdef class Trial:
         self.log_dirname = (
             os.path.join(
                 log_parent_dirname, 
-                self.experiment_name, 
-                self.mod_name))
+                self.experiment_name))
                 
         self.score_history = []
         
@@ -74,6 +73,7 @@ cdef class Trial:
         save_filename = (
             os.path.join(
                 self.log_dirname, 
+                self.mod_name,
                 "save",
                 "trail_save_{self.datetime_str}.pickle".format(**locals())))
         
@@ -104,6 +104,7 @@ cdef class Trial:
         save_filename = (
             os.path.join(
                 self.log_dirname, 
+                self.mod_name,
                 "save",
                 "trail_save_{self.datetime_str}.pickle".format(**locals())))
         
@@ -123,6 +124,7 @@ cdef class Trial:
         save_filename = (
             os.path.join(
                 self.log_dirname, 
+                self.mod_name,
                 "score",
                 "score_{self.datetime_str}.csv".format(**locals())))
         
@@ -244,8 +246,16 @@ cdef class Trial:
         
 
         self.log_score_history()
-        system.output_final_log(self.log_dirname, self.datetime_str)
-        domain.output_final_log(self.log_dirname, self.datetime_str)
+        system.output_final_log(
+            os.path.join(
+                self.log_dirname, 
+                self.mod_name),
+            self.datetime_str)
+        domain.output_final_log(
+            os.path.join(
+                self.log_dirname, 
+                self.mod_name),
+            self.datetime_str)
         
         if self.deletes_final_save_file:
             self.delete_final_save_file()
