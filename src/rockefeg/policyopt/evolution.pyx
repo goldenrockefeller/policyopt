@@ -336,7 +336,7 @@ cdef class BaseEvolvingSystem(BaseSystem):
                         .format(**locals()) ))
 
         self.__phenotypes = phenotypes
-        self._set_unevaluated_phenotypes(phenotypes)
+        self._set_unevaluated_phenotypes(self.phenotypes_shallow_copy())
 
 
     cpdef Py_ssize_t n_unevaluated_phenotypes(self) except *:
