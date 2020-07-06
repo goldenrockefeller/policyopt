@@ -1,6 +1,6 @@
 # distutils: language = c++
 
-from rockefeg.policyopt.policy cimport BaseDifferentiablePolicy
+from .map cimport BaseDifferentiableMap
 from libcpp.vector cimport vector
 
 cdef extern from "<valarray>" namespace "std" nogil:
@@ -16,32 +16,7 @@ cdef extern from "<valarray>" namespace "std" nogil:
 
     valarray[double] tanh (const valarray[double]&)
 
-cdef class BaseNeuralNetwork:
-    cpdef copy(self, copy_obj = ?)
-
-    cpdef eval(self, x)
-
-    cpdef parameters(self)
-
-    cpdef void set_parameters(self, parameters) except *
-
-    cpdef grad_wrt_parameters(self, observation)
-
-    cpdef grad_wrt_observation(self, observation)
-
-cdef class NeuroPolicy(BaseDifferentiablePolicy):
-    cdef object __neural_network
-
-    cpdef neural_network(self)
-    cpdef void set_neural_network(self, neural_network) except *
-
-cdef NeuroPolicy new_NeuroPolicy(BaseNeuralNetwork neural_network)
-cdef void init_NeuroPolicy(
-    NeuroPolicy policy,
-    BaseNeuralNetwork neural_network
-    ) except *
-
-cdef class ReluTanh(BaseNeuralNetwork):
+cdef class ReluTanh(BaseDifferentiableMap):
     cdef vector[valarray[double]] linear0
     cdef valarray[double] bias0
     cdef vector[valarray[double]] linear1
@@ -62,4 +37,29 @@ cdef void init_ReluTanh(
     ) except *
 
 cpdef Py_ssize_t n_parameters_for_ReluTanh(ReluTanh neural_network)
+
+cdef class ReluLinear(BaseDifferentiableMap):
+    cdef vector[valarray[double]] linear0
+    cdef valarray[double] bias0
+    cdef vector[valarray[double]] linear1
+    cdef valarray[double] bias1
+    cdef double leaky_scale # a hyperparameter, not a regular parameter
+
+    cpdef tuple shape(self)
+
+cdef ReluLinear new_ReluLinear(
+    Py_ssize_t n_in_dims,
+    Py_ssize_t n_hidden_neurons,
+    Py_ssize_t n_out_dims,
+    double leaky_scale = ?)
+
+cdef void init_ReluLinear(
+    ReluLinear neural_network,
+    Py_ssize_t n_in_dims,
+    Py_ssize_t n_hidden_neurons,
+    Py_ssize_t n_out_dims,
+    double leaky_scale = ?
+    ) except *
+
+cpdef Py_ssize_t n_parameters_for_ReluLinear(ReluLinear neural_network)
 

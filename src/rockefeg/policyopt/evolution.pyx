@@ -18,7 +18,7 @@ cdef class BasePhenotype:
         else:
             new_phenotype = copy_obj
 
-        new_phenotype.__policy = (<BasePolicy?>self.__policy).copy()
+        new_phenotype.__policy = (<BaseMap?>self.__policy).copy()
 
         return new_phenotype
 
@@ -32,7 +32,7 @@ cdef class BasePhenotype:
         raise NotImplementedError("Abstract method.")
 
     cpdef action(self, observation):
-        return (<BasePolicy?>self.__policy).action(observation)
+        return (<BaseMap?>self.__policy).eval(observation)
 
     cpdef void prep_for_epoch(self) except *:
         raise NotImplementedError("Abstract method.")
@@ -41,12 +41,12 @@ cdef class BasePhenotype:
         return self.__policy
 
     cpdef void set_policy(self, policy) except *:
-        self.__policy = <BasePolicy?>policy
+        self.__policy = <BaseMap?>policy
 
 @cython.warn.undeclared(True)
 cdef void init_BasePhenotype(
         BasePhenotype phenotype,
-        BasePolicy policy
+        BaseMap policy
         ) except *:
     if phenotype is None:
         raise TypeError("The phenotype (phenotype) cannot be None.")
@@ -86,14 +86,14 @@ cdef class DefaultPhenotype(BasePhenotype):
         return child
 
     cpdef void mutate(self, args = None) except *:
-        cdef BasePolicy policy
+        cdef BaseMap policy
         cdef DoubleArray parameters
         cdef object mutation
         cdef Py_ssize_t param_id
         cdef double[:] mutation_view
 
         # TODO Optimize, getting mutation vector is done through python (numpy).
-        policy = <BasePolicy?>self.policy()
+        policy = <BaseMap?>self.policy()
 
         parameters = <DoubleArray?> policy.parameters()
 
@@ -149,7 +149,7 @@ cdef class DefaultPhenotype(BasePhenotype):
         self.__mutation_factor = mutation_factor
 
 @cython.warn.undeclared(True)
-cdef DefaultPhenotype new_DefaultPhenotype(BasePolicy policy):
+cdef DefaultPhenotype new_DefaultPhenotype(BaseMap policy):
     cdef DefaultPhenotype phenotype
 
     phenotype = DefaultPhenotype.__new__(DefaultPhenotype)
@@ -160,7 +160,7 @@ cdef DefaultPhenotype new_DefaultPhenotype(BasePolicy policy):
 @cython.warn.undeclared(True)
 cdef void init_DefaultPhenotype(
         DefaultPhenotype phenotype,
-        BasePolicy policy
+        BaseMap policy
         ) except *:
     if phenotype is None:
         raise TypeError("The INSERT_phenotype (phenotype) cannot be None.")
@@ -223,7 +223,7 @@ cdef class BaseEvolvingSystem(BaseSystem):
         for phenotype in self.__phenotypes:
             phenotype.prep_for_epoch()
 
-        self.__unevaluated_phenotypes = (
+        self._set_unevaluated_phenotypes(
             self.phenotypes_shallow_copy())
         self._set_acting_phenotype(self.__unevaluated_phenotypes[-1])
         self._set_best_phenotype(self.__acting_phenotype)

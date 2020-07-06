@@ -1,5 +1,5 @@
 from .system cimport BaseSystem
-from .policy cimport BasePolicy
+from .map cimport BaseMap
 
 cdef class BasePhenotype:
     cdef object __policy
@@ -22,7 +22,7 @@ cdef class BasePhenotype:
 
 cdef void init_BasePhenotype(
     BasePhenotype phenotype,
-    BasePolicy policy
+    BaseMap policy
     ) except *
 
 cdef class DefaultPhenotype(BasePhenotype):
@@ -41,11 +41,11 @@ cdef class DefaultPhenotype(BasePhenotype):
     cpdef void set_fitness(self, double fitness) except *
 
 
-cdef DefaultPhenotype new_DefaultPhenotype(BasePolicy policy)
+cdef DefaultPhenotype new_DefaultPhenotype(BaseMap policy)
 
 cdef void init_DefaultPhenotype(
     DefaultPhenotype phenotype,
-    BasePolicy policy
+    BaseMap policy
     ) except *
 
 cdef class BaseEvolvingSystem(BaseSystem):
