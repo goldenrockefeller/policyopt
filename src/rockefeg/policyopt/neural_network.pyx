@@ -156,11 +156,11 @@ cdef class ReluTanh(BaseDifferentiableMap):
         return eval
 
 
-    cpdef grad_wrt_parameters(self, input):
+    cpdef jacobian_wrt_parameters(self, input):
         # TODO
         raise NotImplementedError("Not implmented yet")
 
-    cpdef grad_wrt_input(self, input):
+    cpdef jacobian_wrt_input(self, input):
         # TODO
         raise NotImplementedError("Not implmented yet")
 
@@ -447,11 +447,11 @@ cdef class ReluLinear(BaseDifferentiableMap):
         return eval
 
 
-    cpdef grad_wrt_parameters(self, input):
+    cpdef jacobian_wrt_parameters(self, input):
         # TODO
         raise NotImplementedError("Not implmented yet")
 
-    cpdef grad_wrt_input(self, input):
+    cpdef jacobian_wrt_input(self, input):
         # TODO
         raise NotImplementedError("Not implmented yet")
 

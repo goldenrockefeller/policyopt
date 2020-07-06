@@ -20,8 +20,8 @@ cdef class BaseMap:
 @cython.auto_pickle(True)
 cdef class BaseDifferentiableMap(BaseMap):
 
-    cpdef grad_wrt_parameters(self, input):
+    cpdef jacobian_wrt_parameters(self, input):
         raise NotImplementedError("Abstract method.")
 
-    cpdef grad_wrt_input(self, input):
+    cpdef jacobian_wrt_input(self, input):
         raise NotImplementedError("Abstract method.")
