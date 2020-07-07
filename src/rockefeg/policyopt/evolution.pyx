@@ -279,7 +279,7 @@ cdef class BaseEvolvingSystem(BaseSystem):
     cpdef void append_phenotype(self, phenotype) except *:
         self.__phenotypes.append(<BasePhenotype?>phenotype)
 
-    cpdef pop_phenotype(self, Py_ssize_t index):
+    cpdef pop_phenotype(self, Py_ssize_t index = -1):
         return self.__phenotypes.pop(index)
 
     cpdef void insert_phenotype(self, Py_ssize_t index, phenotype) except *:
@@ -344,7 +344,7 @@ cdef class BaseEvolvingSystem(BaseSystem):
         self.__unevaluated_phenotypes.append(
             <BasePhenotype?>unevaluated_phenotype)
 
-    cpdef _pop_unevaluated_phenotype(self, Py_ssize_t index):
+    cpdef _pop_unevaluated_phenotype(self, Py_ssize_t index = -1):
         return self.__unevaluated_phenotypes.pop(index)
 
     cpdef void _insert_unevaluated_phenotype(

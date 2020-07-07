@@ -8,7 +8,7 @@ cdef class MultiagentSystem(BaseSystem):
 
     cpdef Py_ssize_t n_agents(self) except *
     cpdef void append_agent_system(self, agent_system) except *
-    cpdef pop_agent_system(self, Py_ssize_t index)
+    cpdef pop_agent_system(self, Py_ssize_t index = ?)
     cpdef void insert_agent_system(
         self,
         Py_ssize_t index,

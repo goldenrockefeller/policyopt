@@ -108,7 +108,7 @@ cdef class MultiagentSystem(BaseSystem):
     cpdef void append_agent_system(self, agent_system) except *:
         self.__agent_systems.append(<BaseSystem?>agent_system)
 
-    cpdef pop_agent_system(self, Py_ssize_t index):
+    cpdef pop_agent_system(self, Py_ssize_t index = -1):
         return self.__agent_systems.pop(index)
 
     cpdef void insert_agent_system(
