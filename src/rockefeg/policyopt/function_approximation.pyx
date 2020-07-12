@@ -3,22 +3,22 @@ from rockefeg.cyutil.array cimport DoubleArray, new_DoubleArray
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
-cdef class ValueTargetEntry:
+cdef class TargetEntry:
     def __init__(self, input, target):
-        init_ValueTargetEntry(self, input, target)
+        init_TargetEntry(self, input, target)
 
 
 @cython.warn.undeclared(True)
-cdef ValueTargetEntry new_ValueTargetEntry(input, target):
-    cdef ValueTargetEntry entry
+cdef TargetEntry new_TargetEntry(input, target):
+    cdef TargetEntry entry
 
-    entry = ValueTargetEntry.__new__(ValueTargetEntry)
-    init_ValueTargetEntry(entry, input, target)
+    entry = TargetEntry.__new__(TargetEntry)
+    init_TargetEntry(entry, input, target)
 
     return entry
 
 @cython.warn.undeclared(True)
-cdef void init_ValueTargetEntry(ValueTargetEntry entry, input, target) except *:
+cdef void init_TargetEntry(TargetEntry entry, input, target) except *:
     if entry is None:
         raise TypeError("The INSERT_entry (entry) cannot be None.")
 
@@ -73,7 +73,7 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         cdef DoubleArray entry_grad_wrt_parameters
         cdef DoubleArray sum_grad_wrt_parameters
         cdef BaseDifferentiableMap map
-        cdef ValueTargetEntry entry
+        cdef TargetEntry entry
         cdef Py_ssize_t n_entries
         cdef Py_ssize_t n_entry_parameters
         cdef Py_ssize_t n_parameters

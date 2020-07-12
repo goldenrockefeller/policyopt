@@ -1,11 +1,11 @@
 from .map cimport BaseMap, BaseDifferentiableMap
 
-cdef class ValueTargetEntry:
+cdef class TargetEntry:
     cdef public object input
     cdef public object target
 
-cdef ValueTargetEntry new_ValueTargetEntry(input, target)
-cdef void init_ValueTargetEntry(ValueTargetEntry entry, input, target) except *
+cdef TargetEntry new_TargetEntry(input, target)
+cdef void init_TargetEntry(TargetEntry entry, input, target) except *
 
 cdef class BaseFunctionApproximator(BaseMap):
     cpdef batch_update(self, list entries)
