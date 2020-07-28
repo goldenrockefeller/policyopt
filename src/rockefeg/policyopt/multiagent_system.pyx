@@ -1,6 +1,7 @@
 cimport cython
 from .system cimport BaseSystem
-
+from rockefeg.cyutil.typed_list cimport BaseReadableTypedList,  new_TypedList
+from rockefeg.cyutil.typed_list cimport is_sub_full_type
 
 
 @cython.warn.undeclared(True)
@@ -30,7 +31,7 @@ cdef class MultiagentSystem(BaseSystem):
 
         is_done_training = True
 
-        for system in self.__agent_systems:
+        for system in self.agent_systems():
             is_done_training = is_done_training and system.is_done_training()
 
         return  is_done_training
@@ -38,7 +39,7 @@ cdef class MultiagentSystem(BaseSystem):
     cpdef void prep_for_epoch(self) except *:
         cdef BaseSystem system
 
-        for system in self.__agent_systems:
+        for system in self.agent_systems():
             system.prep_for_epoch()
 
     cpdef bint is_ready_for_evaluation(self) except *:
@@ -47,7 +48,7 @@ cdef class MultiagentSystem(BaseSystem):
 
         is_ready_for_evaluation = True
 
-        for system in self.__agent_systems:
+        for system in self.agent_systems():
             is_ready_for_evaluation = (
                 is_ready_for_evaluation
                 and system.is_ready_for_evaluation())
@@ -60,13 +61,16 @@ cdef class MultiagentSystem(BaseSystem):
         cdef list joint_observation
         cdef BaseSystem system
         cdef Py_ssize_t agent_id
+        cdef BaseReadableTypedList agent_systems
+
+        agent_systems = self.agent_systems()
 
         joint_observation = observation
 
-        joint_action = [None] * self.n_agents()
+        joint_action = [None] * len(self.agent_systems())
 
-        for agent_id in range(self.n_agents()):
-            system = self.__agent_systems[agent_id]
+        for agent_id in range(len(self.agent_systems())):
+            system = agent_systems.item(agent_id)
             joint_action[agent_id] = system.action(joint_observation[agent_id])
 
         return joint_action
@@ -77,96 +81,53 @@ cdef class MultiagentSystem(BaseSystem):
         cdef list cy_feedback
         cdef BaseSystem system
         cdef Py_ssize_t agent_id
+        cdef BaseReadableTypedList agent_systems
+
+        agent_systems = self.agent_systems()
 
         cy_feedback = feedback
 
-        for agent_id in range(self.n_agents()):
-            system = self.__agent_systems[agent_id]
+        for agent_id in range(len(self.agent_systems())):
+            system = agent_systems.item(agent_id)
             system.receive_feedback(cy_feedback[agent_id])
 
     cpdef void update_policy(self) except *:
         cdef BaseSystem system
 
-        for system in self.__agent_systems:
+        for system in self.agent_systems():
             system.update_policy()
 
     cpdef void receive_score(self, score) except *:
         cdef BaseSystem system
 
-        for system in self.__agent_systems:
+        for system in self.agent_systems():
             system.receive_score(score)
 
     cpdef void output_final_log(self, log_dirname, datetime_str) except *:
         cdef BaseSystem system
 
-        for system in self.__agent_systems:
+        for system in self.agent_systems():
             system.output_final_log(log_dirname, datetime_str)
 
-    cpdef Py_ssize_t n_agents(self) except *:
-          return len(self.__agent_systems)
-
-    cpdef void append_agent_system(self, agent_system) except *:
-        self.__agent_systems.append(<BaseSystem?>agent_system)
-
-    cpdef pop_agent_system(self, Py_ssize_t index = -1):
-        return self.__agent_systems.pop(index)
-
-    cpdef void insert_agent_system(
-            self,
-            Py_ssize_t index,
-            agent_system
-            ) except *:
-        self.__agent_systems.insert(index, <BaseSystem?>agent_system)
-
-    cpdef agent_system(self, Py_ssize_t index):
-        return self.__agent_systems[index]
-
-    cpdef void set_agent_system(self, Py_ssize_t index, agent_system) except *:
-        self.__agent_systems[index] = <BaseSystem?>agent_system
-
-    cpdef list _agent_systems(self):
+    cpdef agent_systems(self):
         return self.__agent_systems
 
-    cpdef list agent_systems_shallow_copy(self):
-        cdef list agent_systems_copy
-        cdef Py_ssize_t agent_system_id
+    cpdef void set_agent_systems(self, agent_systems) except *:
+        cdef BaseReadableTypedList new_agent_systems = (
+            <BaseReadableTypedList?> agent_systems)
+        cdef object systems_item_type
 
-        agent_systems_copy = [None] * len(self.__agent_systems)
+        systems_item_type = new_agent_systems.item_type()
 
-        for agent_system_id in range(len(self.__agent_systems)):
-            agent_systems_copy[agent_system_id] = (
-                self.__agent_systems[agent_system_id])
+        if not is_sub_full_type(systems_item_type, BaseSystem):
+            raise (
+                TypeError(
+                    "The agent system's item type "
+                    "(agent_systems.item_type() = {systems_item_type}) "
+                    "must be a subtype of BaseSystem."
+                    .format(**locals())))
 
-        return agent_systems_copy
-
-    cpdef list agent_systems_deep_copy(self):
-        cdef list agent_systems_copy
-        cdef Py_ssize_t agent_system_id
-        cdef BaseSystem agent_system
-
-        agent_systems_copy = [None] * len(self.__agent_systems)
-
-        for agent_system_id in range(len(self.__agent_systems)):
-            agent_system = self.__agent_systems[agent_system_id]
-            agent_systems_copy[agent_system_id] = agent_system.copy()
-
-        return agent_systems_copy
-
-    cpdef void set_agent_systems(self, list agent_systems) except *:
-        cdef Py_ssize_t agent_system_id
-        cdef BaseSystem agent_system
-
-        for agent_system_id in range(len(agent_systems)):
-            agent_system = agent_systems[agent_system_id]
-            if not isinstance(agent_system, BaseSystem):
-                raise (
-                    TypeError(
-                        "All objects in (agent_systems) must be instances of "
-                        "BaseSystem. (type(agent_systems[{agent_system_id}]) = "
-                        "{agent_system.__class__})."
-                        .format(**locals()) ))
-
-        self.__agent_systems = agent_systems
+        self.__agent_systems = new_agent_systems
 
 @cython.warn.undeclared(True)
 cdef MultiagentSystem new_MultiagentSystem():
@@ -182,4 +143,4 @@ cdef void init_MultiagentSystem(MultiagentSystem system) except *:
     if system is None:
         raise TypeError("The system (system) cannot be None.")
 
-    system.__agent_systems = []
+    system.__agent_systems = new_TypedList(BaseSystem)

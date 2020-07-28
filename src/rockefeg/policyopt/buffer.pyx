@@ -1,42 +1,69 @@
 cimport cython
 
+from rockefeg.cyutil.typed_list cimport TypedList, new_TypedList
+from rockefeg.cyutil.typed_list cimport new_FixedLenTypedList
+
 import numpy as np
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class ShuffleBuffer:
-    def __init__(self, Py_ssize_t capacity):
-        init_ShuffleBuffer(self, capacity)
+    def __init__(self, item_type):
+        init_ShuffleBuffer(self, item_type)
 
     cpdef copy(self, copy_obj = None):
         cdef ShuffleBuffer new_buffer
+        cdef list shuffled_data_list
+        cdef TypedList staged_data
+        cdef TypedList shuffled_data
 
         if copy_obj is None:
             new_buffer = ShuffleBuffer.__new__(ShuffleBuffer)
         else:
             new_buffer = copy_obj
 
-        new_buffer.__shuffled_data = self.__shuffled_data.copy()
-        new_buffer.__staged_data = self.__staged_data.copy()
+        staged_data = self.__staged_data
+        new_buffer.__staged_data = staged_data.shallow_copy()
+
+        shuffled_data = self.__shuffled_data
+        new_buffer.__shuffled_data = shuffled_data.shallow_copy()
+
         new_buffer.__capacity = self.__capacity
         new_buffer.__buffer_pos = self.__buffer_pos
+        new_buffer.__item_type = self.__item_type
+
+        # Reshuffle the new buffer to decorrelate with self buffer.
+        # TODO: .shuffle  can be optimized
+        shuffled_data_list =  shuffled_data.items_shallow_copy()
+        np.random.shuffle(shuffled_data_list)
+        shuffled_data.set_items(shuffled_data_list)
 
         return new_buffer
 
     cpdef void add_staged_datum(self, datum) except *:
-        if len(self.__staged_data) >= capacity:
-            self._append_staged_datum(datum)
+        cdef TypedList staged_data
+        cdef Py_ssize_t buffer_pos
+
+        staged_data = self._staged_data()
+
+        if len(staged_data) < self.capacity():
+            staged_data.append(datum)
         else:
             # Replace at buffer position and move the buffer position.
-            self._set_staged_datum(self.__buffer_pos, datum)
-            self._set_buffer_pos(self.__buffer_pos + 1)
-            if self.__buffer_pos == capacity:
-                self._set_buffer_pos(0)
+            buffer_pos = self._buffer_pos()
+            staged_data.set_item(buffer_pos, datum)
+            buffer_pos += 1
+            if buffer_pos == self.capacity():
+                buffer_pos = 0
+            self._set_buffer_pos(buffer_pos)
 
+    cpdef next_shuffled_datum(self):
+        cdef list shuffled_data_list
+        cdef TypedList shuffled_data
+        cdef TypedList staged_data
 
-
-    cpdef next_shuffled_datum(self, Py_ssize_t index = ?):
-        cdef list new_shuffled_data
+        staged_data = self._staged_data()
+        shuffled_data = self._shuffled_data()
 
         if self.is_empty():
             raise (
@@ -44,58 +71,94 @@ cdef class ShuffleBuffer:
                     "Can not get next shuffled datum when the buffer is empty. "
                     "(self.is_empty() = True)" ))
 
-        if len(self.__shuffled_datum) == 0:
-            if len(self.__staged_datum) == 0:
+        if len(shuffled_data) == 0:
+            if len(staged_data) == 0:
                 raise (
                     RuntimeError(
                         "Something went wrong: Buffer may or may not be empty"))
             else:
-                new_shuffled_data = self.__staged_data.copy()
-                np.random.shuffle(new_shuffled_data)
-                self._set_shuffled_data(new_shuffled_data)
+                # TODO .shuffle() can be optimized
+                shuffled_data_list =  staged_data.items_shallow_copy()
+                np.random.shuffle(shuffled_data_list)
+                shuffled_data.set_items(shuffled_data_list)
 
-        return self._pop_shuffled_datum()
+        return shuffled_data.pop()
 
 
     cpdef void clear(self) except *:
-        self._set_shuffled_data([])
-        self._set_staged_data([])
+        cdef TypedList shuffled_data
+        cdef TypedList staged_data
+
+        staged_data = self._staged_data()
+        shuffled_data = self._shuffled_data()
+
+        staged_data.set_items([])
+        shuffled_data.set_items([])
         self._set_buffer_pos(0)
 
     cpdef bint is_empty(self) except *:
-        return (
-            (self.n_staged_data_points() == 0)
-            and (self.n_shuffled_data_points() == 0) )
+        cdef TypedList shuffled_data
+        cdef TypedList staged_data
 
+        staged_data = self._staged_data()
+        shuffled_data = self._shuffled_data()
+
+        return (
+            (len(staged_data) == 0)
+            and (len(shuffled_data) == 0) )
 
     cpdef Py_ssize_t capacity(self) except *:
         return self.__capacity
 
     cpdef void set_capacity(self, Py_ssize_t capacity) except *:
+        cdef list new_staged_data
+        cdef Py_ssize_t buffer_pos
+        cdef Py_ssize_t datum_id
+        cdef TypedList staged_data
+
+        staged_data = self._staged_data()
+
         if capacity <= 0:
             raise (
                 ValueError(
                     "The capacity (capacity = {capacity}) must be positive."
                     .format(**locals()) ))
-        self.__capacity = capacity
 
+        if capacity < self.__capacity:
+            new_staged_data = [None] * capacity
+
+            buffer_pos = self._buffer_pos()
+            buffer_pos += self.__capacity - capacity
+            if buffer_pos > self.__capacity:
+                buffer_pos -= self.__capacity
+
+            for datum_id in range(len(new_staged_data)):
+                new_staged_data[datum_id] = staged_data.item(buffer_pos)
+                buffer_pos += 1
+                if buffer_pos > self.__capacity:
+                    buffer_pos -= self.__capacity
+
+            staged_data.set_items(new_staged_data)
+            self._set_buffer_pos(0)
+
+        self.__capacity = capacity
 
     cpdef Py_ssize_t _buffer_pos(self) except *:
         return self.__buffer_pos
 
-
     cpdef void _set_buffer_pos(self, Py_ssize_t buffer_pos) except *:
         cdef Py_ssize_t n_staged_data_points
 
-        n_staged_data_points = self.n_staged_data_points()
+        n_staged_data_points = len(self._staged_data())
 
-        if buffer_pos <= 0:
+        if buffer_pos < 0:
             raise (
                 ValueError(
                     "The buffer position (buffer_pos = {buffer_pos}) "
-                    "must be positive."
+                    "must be non-negative."
                     .format(**locals()) ))
-        if buffer_pos >= len(self.__staged_data):
+
+        if buffer_pos >= len(self._staged_data()):
             raise (
                 IndexError(
                     "The buffer position (buffer_pos = {buffer_pos}) "
@@ -105,95 +168,39 @@ cdef class ShuffleBuffer:
 
         self.__buffer_pos = buffer_pos
 
-    cpdef Py_ssize_t n_staged_data_points(self) except *:
-          return len(self.__staged_data)
+    cpdef fixed_len_staged_data(self):
+        return new_FixedLenTypedList(self._staged_data())
 
-    cpdef void _append_staged_datum(self, staged_datum) except *:
-        self.__staged_data.append(staged_datum)
-
-    cpdef _pop_staged_datum(self, Py_ssize_t index = -1):
-        return self.__staged_data.pop(index)
-
-    cpdef void _insert_staged_datum(
-            self,
-            Py_ssize_t index,
-            staged_datum
-            ) except *:
-        self.__staged_data.insert(index, staged_datum)
-
-    cpdef void _set_staged_datum(self, Py_ssize_t index, staged_datum) except *:
-        self.__staged_data[index] = staged_datum
-
-    cpdef list _staged_data(self):
+    cpdef _staged_data(self):
         return self.__staged_data
 
-    cpdef void _set_staged_data(self, list staged_data) except *:
-        cdef Py_ssize_t staged_datum_id
-        cdef object staged_datum
 
-        for staged_datum_id in range(len(staged_data)):
-            staged_datum = staged_data[staged_datum_id]
+    cpdef fixed_len_shuffled_data(self):
+        return new_FixedLenTypedList(self._shuffled_data())
 
-        self.__staged_data = staged_data
-
-    cpdef Py_ssize_t n_shuffled_data_points(self) except *:
-          return len(self.__shuffled_data)
-
-    cpdef void _append_shuffled_datum(self, shuffled_datum) except *:
-        self.__shuffled_data.append(shuffled_datum)
-
-    cpdef _pop_shuffled_datum(self, Py_ssize_t index = -1):
-        return self.__shuffled_data.pop(index)
-
-    cpdef void _insert_shuffled_datum(
-            self,
-            Py_ssize_t index,
-            shuffled_datum
-            ) except *:
-        self.__shuffled_data.insert(index, shuffled_datum)
-
-    cpdef void _set_shuffled_datum(self, Py_ssize_t index, shuffled_datum) except *:
-        self.__shuffled_data[index] = shuffled_datum
-
-    cpdef list _shuffled_data(self):
+    cpdef _shuffled_data(self):
         return self.__shuffled_data
 
-    cpdef void _set_shuffled_data(self, list shuffled_data) except *:
-        cdef Py_ssize_t shuffled_datum_id
-        cdef object shuffled_datum
-
-        for shuffled_datum_id in range(len(shuffled_data)):
-            shuffled_datum = shuffled_data[shuffled_datum_id]
-
-        self.__shuffled_data = shuffled_data
-
-
+    cpdef item_type(self):
+        return self.__item_type
 
 
 @cython.warn.undeclared(True)
-cdef ShuffleBuffer new_ShuffleBuffer(Py_ssize_t capacity):
+cdef ShuffleBuffer new_ShuffleBuffer(item_type):
     cdef ShuffleBuffer buffer
 
     buffer = ShuffleBuffer.__new__(ShuffleBuffer)
-    init_ShuffleBuffer(buffer, capacity)
+    init_ShuffleBuffer(buffer, item_type)
 
     return buffer
 
 @cython.warn.undeclared(True)
-cdef void init_ShuffleBuffer(
-        ShuffleBuffer buffer,
-        Py_ssize_t capacity
-        ) except *:
+cdef void init_ShuffleBuffer(ShuffleBuffer buffer, item_type) except *:
     if buffer is None:
         raise TypeError("The buffer (buffer) cannot be None.")
 
-    if capacity <= 0:
-        raise (
-            ValueError(
-                "The capacity (capacity = {capacity}) must be positive."
-                .format(**locals()) ))
-
-    __staged_data = []
-    __data = []
-    __capacity = capacity
-    __buffer_pos = 0
+    buffer.__staged_data = new_TypedList(item_type)
+    buffer.__shuffled_data = new_TypedList(item_type)
+    buffer.__capacity = 1
+    buffer.__buffer_pos = 0
+    buffer.__item_type = item_type

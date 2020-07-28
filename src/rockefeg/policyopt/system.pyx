@@ -3,7 +3,7 @@ cimport cython
 @cython.warn.undeclared(True)
 cdef class BaseSystem:
     cpdef copy(self, copy_obj = None):
-        raise NotImplementedError("Abstract method.")
+        pass
 
     cpdef bint is_done_training(self) except *:
         raise NotImplementedError("Abstract method.")

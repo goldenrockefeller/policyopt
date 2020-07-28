@@ -1,6 +1,9 @@
 cimport cython
 
 from rockefeg.cyutil.array cimport DoubleArray
+from rockefeg.cyutil.typed_list cimport TypedList, new_TypedList
+from rockefeg.cyutil.typed_list cimport new_FixedLenTypedList, FixedLenTypedList
+from rockefeg.cyutil.typed_list cimport is_sub_full_type, BaseWritableTypedList
 
 import random
 import numpy as np
@@ -32,7 +35,17 @@ cdef class BasePhenotype:
         raise NotImplementedError("Abstract method.")
 
     cpdef action(self, observation):
-        return (<BaseMap?>self.__policy).eval(observation)
+        cdef BaseMap policy
+
+        policy = self.policy()
+
+        return policy.eval(observation)
+
+    cpdef double fitness(self) except *:
+        raise NotImplementedError("Abstract method.")
+
+    cpdef void set_fitness(self, double fitness) except *:
+        raise NotImplementedError("Abstract method.")
 
     cpdef void prep_for_epoch(self) except *:
         raise NotImplementedError("Abstract method.")
@@ -182,15 +195,32 @@ cdef class BaseEvolvingSystem(BaseSystem):
         cdef BaseEvolvingSystem new_system
         cdef BasePhenotype phenotype
         cdef Py_ssize_t phenotype_id
+        cdef BaseWritableTypedList phenotypes
+        cdef BaseWritableTypedList new_phenotypes
+        cdef TypedList unevaluated_phenotypes
+        cdef TypedList new_unevaluated_phenotypes
 
         if copy_obj is None:
             new_system = BaseEvolvingSystem.__new__(BaseEvolvingSystem)
         else:
             new_system = copy_obj
 
-        new_system.__phenotypes = self.phenotypes_deep_copy()
-        new_system.__unevaluated_phenotypes = (
-            new_system.phenotypes_shallow_copy())
+        # Deep Copy
+        phenotypes = self.__phenotypes
+        new_phenotypes = phenotypes.shallow_copy()
+        for phenotype_id in range(len(phenotypes)):
+            phenotype = phenotypes.item(phenotype_id)
+            new_phenotypes.set_item(phenotype_id, phenotype.copy())
+        new_system.__phenotypes = new_phenotypes
+
+        # Deep Copy
+        unevaluated_phenotypes = self.__unevaluated_phenotypes
+        new_unevaluated_phenotypes = unevaluated_phenotypes.shallow_copy()
+        for phenotype_id in range(len(unevaluated_phenotypes)):
+            phenotype = unevaluated_phenotypes.item(phenotype_id)
+            new_unevaluated_phenotypes.set_item(phenotype_id, phenotype.copy())
+        new_system.__unevaluated_phenotypes = new_unevaluated_phenotypes
+
         new_system.__best_phenotypes = None
         new_system.__acting_phenotype = None
         new_system.__max_n_epochs = self.__max_n_epochs
@@ -199,18 +229,23 @@ cdef class BaseEvolvingSystem(BaseSystem):
         return new_system
 
     cpdef bint is_done_training(self) except *:
-        return self.__n_epochs_elapsed >= self.__max_n_epochs
+        return self.n_epochs_elapsed() >= self.max_n_epochs()
 
     cpdef void prep_for_epoch(self) except *:
         cdef BasePhenotype phenotype
         cdef Py_ssize_t n_phenotypes
+        cdef TypedList unevaluated_phenotypes
+        cdef BaseWritableTypedList phenotypes
 
-        n_phenotypes = self.n_phenotypes()
+        phenotypes = self.phenotypes()
+        unevaluated_phenotypes = self._unevaluated_phenotypes()
+        n_phenotypes = len(phenotypes)
+
 
         if n_phenotypes == 0:
             raise (
                 RuntimeError(
-                    "The number of phenotypes (self.n_phenotypes() = "
+                    "The number of phenotypes (len(self.phenotypes()) = "
                     "{n_phenotypes}) must be positive."
                     .format(**locals())))
 
@@ -220,49 +255,59 @@ cdef class BaseEvolvingSystem(BaseSystem):
                 "Cannot prepare for the next epoch. "
                 "The system has stopped training."))
 
-        for phenotype in self.__phenotypes:
+        for phenotype in self.phenotypes():
             phenotype.prep_for_epoch()
 
-        self._set_unevaluated_phenotypes(
-            self.phenotypes_shallow_copy())
-        self._set_acting_phenotype(self.__unevaluated_phenotypes[-1])
-        self._set_best_phenotype(self.__acting_phenotype)
+        unevaluated_phenotypes.set_items(phenotypes.items_shallow_copy())
+        self._set_acting_phenotype(unevaluated_phenotypes.item(-1))
+        self._set_best_phenotype(self.acting_phenotype())
 
     cpdef bint is_ready_for_evaluation(self) except *:
-        return len(self.__unevaluated_phenotypes) == 0
+        return len(self._unevaluated_phenotypes()) == 0
 
     cpdef action(self, observation):
-        return (
-            (<BasePhenotype?>self.__acting_phenotype).action(observation))
+        cdef BasePhenotype acting_phenotype
+
+        acting_phenotype = self.acting_phenotype()
+
+        return acting_phenotype.action(observation)
 
     cpdef void receive_feedback(self, feedback) except *:
-        (<BasePhenotype?>self.__acting_phenotype).receive_feedback(feedback)
+        cdef BasePhenotype acting_phenotype
+
+        acting_phenotype = self.acting_phenotype()
+
+        acting_phenotype.receive_feedback(feedback)
 
     cpdef void update_policy(self) except *:
         cdef BasePhenotype acting_phenotype
+        cdef BasePhenotype best_phenotype
         cdef double acting_fitness
         cdef double best_epoch_fitness
+        cdef TypedList unevaluated_phenotypes
 
-        acting_phenotype = <BasePhenotype?>self.__acting_phenotype
+        acting_phenotype = self.acting_phenotype()
         acting_fitness = acting_phenotype.fitness()
-        best_epoch_fitness = self.best_phenotype().fitness()
+        best_phenotype = self.best_phenotype()
+        best_epoch_fitness = best_phenotype.fitness()
+        unevaluated_phenotypes = self._unevaluated_phenotypes()
 
         # Update the best phenotype.
         if acting_fitness > best_epoch_fitness:
             self._set_best_phenotype(acting_phenotype)
 
         # Remove current evaluated phenotype.
-        self.__unevaluated_phenotypes.pop()
+        unevaluated_phenotypes.pop()
 
         if len(self.__unevaluated_phenotypes) > 0:
             # Get new phenotype to evaluate.
-            self._set_acting_phenotype(self.__unevaluated_phenotypes[-1])
-        elif self.__n_epochs_elapsed < self.__max_n_epochs:
+            self._set_acting_phenotype(unevaluated_phenotypes.item(-1))
+        elif self.n_epochs_elapsed() < self.max_n_epochs():
             # The epoch has ended, operate of phenotype population.
             # Set the policy to the best phenotype for evaluation.
-            self._set_acting_phenotype(self.__best_phenotype)
+            self._set_acting_phenotype(self.best_phenotype())
             self.operate()
-            self._set_n_epochs_elapsed(self.__n_epochs_elapsed + 1)
+            self._set_n_epochs_elapsed(self.n_epochs_elapsed() + 1)
 
     cpdef void operate(self) except *:
         raise NotImplementedError("Abstract method.")
@@ -273,164 +318,47 @@ cdef class BaseEvolvingSystem(BaseSystem):
     cpdef void output_final_log(self, log_dirname, datetime_str) except *:
         pass
 
-    cpdef Py_ssize_t n_phenotypes(self) except *:
-          return len(self.__phenotypes)
-
-    cpdef void append_phenotype(self, phenotype) except *:
-        self.__phenotypes.append(<BasePhenotype?>phenotype)
-
-    cpdef pop_phenotype(self, Py_ssize_t index = -1):
-        return self.__phenotypes.pop(index)
-
-    cpdef void insert_phenotype(self, Py_ssize_t index, phenotype) except *:
-        self.__phenotypes.insert(index, <BasePhenotype?>phenotype)
-
-    cpdef phenotype(self, Py_ssize_t index):
-        return self.__phenotypes[index]
-
-    cpdef void set_phenotype(self, Py_ssize_t index, phenotype) except *:
-        self.__phenotypes[index] = <BasePhenotype?>phenotype
-
-    cpdef list _phenotypes(self):
+    cpdef phenotypes(self):
         return self.__phenotypes
 
-    cpdef list phenotypes_shallow_copy(self):
-        cdef list phenotypes_copy
-        cdef Py_ssize_t phenotype_id
+    cpdef void set_phenotypes(self, phenotypes) except *:
+        cdef BaseWritableTypedList setting_phenotypes = (
+            <BaseWritableTypedList?> phenotypes)
+        cdef object phenotypes_item_type
 
-        phenotypes_copy = [None] * len(self.__phenotypes)
+        phenotypes_item_type = setting_phenotypes.item_type()
 
-        for phenotype_id in range(len(self.__phenotypes)):
-            phenotypes_copy[phenotype_id] = self.__phenotypes[phenotype_id]
+        if not is_sub_full_type(phenotypes_item_type, BasePhenotype):
+            raise (
+                TypeError(
+                    "The phenotype list's item type "
+                    "(phenotypes.item_type() = {phenotypes_item_type}) "
+                    "must be a subtype of BasePhenotype."
+                    .format(**locals())))
 
-        return phenotypes_copy
+        self.__phenotypes = setting_phenotypes
 
-    cpdef list phenotypes_deep_copy(self):
-        cdef list phenotypes_copy
-        cdef Py_ssize_t phenotype_id
-        cdef BasePhenotype phenotype
+    cpdef fixed_len_unevaluated_phenotypes(self, unevaluated_phenotypes):
+        return new_FixedLenTypedList(self._unevaluated_phenotypes())
 
-        phenotypes_copy = [None] * len(self.__phenotypes)
-
-        for phenotype_id in range(len(self.__phenotypes)):
-            phenotype = self.__phenotypes[phenotype_id]
-            phenotypes_copy[phenotype_id] = phenotype.copy()
-
-        return phenotypes_copy
-
-    cpdef void set_phenotypes(self, list phenotypes) except *:
-        cdef Py_ssize_t phenotype_id
-        cdef BasePhenotype phenotype
-
-        for phenotype_id in range(len(phenotypes)):
-            phenotype = phenotypes[phenotype_id]
-            if not isinstance(phenotype, BasePhenotype):
-                raise (
-                    TypeError(
-                        "All objects in (phenotypes) must be instances of "
-                        "BasePhenotype. (type(phenotypes[{phenotype_id}]) = "
-                        "{phenotype.__class__})."
-                        .format(**locals()) ))
-
-        self.__phenotypes = phenotypes
-
-    cpdef Py_ssize_t n_unevaluated_phenotypes(self) except *:
-          return len(self.__unevaluated_phenotypes)
-
-    cpdef void _append_unevaluated_phenotype(
-            self,
-            unevaluated_phenotype
-            ) except *:
-        self.__unevaluated_phenotypes.append(
-            <BasePhenotype?>unevaluated_phenotype)
-
-    cpdef _pop_unevaluated_phenotype(self, Py_ssize_t index = -1):
-        return self.__unevaluated_phenotypes.pop(index)
-
-    cpdef void _insert_unevaluated_phenotype(
-            self,
-            Py_ssize_t index,
-            unevaluated_phenotype
-            ) except *:
-        self.__unevaluated_phenotypes.insert(
-            index,
-            <BasePhenotype?>unevaluated_phenotype)
-
-    cpdef _unevaluated_phenotype(self, Py_ssize_t index):
-        return self.__unevaluated_phenotypes[index]
-
-    cpdef unevaluated_phenotype_copy(self, Py_ssize_t index):
-        return <BasePhenotype?>(self.__unevaluated_phenotypes[index]).copy()
-
-    cpdef void _set_unevaluated_phenotype(
-            self,
-            Py_ssize_t index,
-            unevaluated_phenotype
-            ) except *:
-        self.__unevaluated_phenotypes[index] = (
-            <BasePhenotype?>unevaluated_phenotype)
-
-    cpdef list _unevaluated_phenotypes(self):
+    cpdef _unevaluated_phenotypes(self):
         return self.__unevaluated_phenotypes
-
-    cpdef list _unevaluated_phenotypes_shallow_copy(self):
-        cdef list unevaluated_phenotypes_copy
-        cdef Py_ssize_t unevaluated_phenotype_id
-
-        unevaluated_phenotypes_copy = (
-            [None] * len(self.__unevaluated_phenotypes))
-
-        for unevaluated_phenotype_id in range(len(self.__unevaluated_phenotypes)):
-            unevaluated_phenotypes_copy[unevaluated_phenotype_id] = (
-                self.__unevaluated_phenotypes[unevaluated_phenotype_id])
-
-        return unevaluated_phenotypes_copy
-
-    cpdef list unevaluated_phenotypes_deep_copy(self):
-        cdef list unevaluated_phenotypes_copy
-        cdef Py_ssize_t unevaluated_phenotype_id
-        cdef BasePhenotype unevaluated_phenotype
-
-        unevaluated_phenotypes_copy = [None] * len(self.__unevaluated_phenotypes)
-
-        for unevaluated_phenotype_id in range(len(self.__unevaluated_phenotypes)):
-            unevaluated_phenotype = (
-                self.__unevaluated_phenotypes[unevaluated_phenotype_id])
-            unevaluated_phenotypes_copy[unevaluated_phenotype_id] = (
-                unevaluated_phenotype.copy())
-
-        return unevaluated_phenotypes_copy
-
-    cpdef void _set_unevaluated_phenotypes(
-            self,
-            list unevaluated_phenotypes) except *:
-        cdef Py_ssize_t unevaluated_phenotype_id
-        cdef BasePhenotype unevaluated_phenotype
-
-        for unevaluated_phenotype_id in range(len(unevaluated_phenotypes)):
-            unevaluated_phenotype = (
-                unevaluated_phenotypes[unevaluated_phenotype_id])
-            if not isinstance(unevaluated_phenotype, BasePhenotype):
-                raise (
-                    TypeError(
-                        "All objects in (unevaluated_phenotypes) must be instances of "
-                        "BasePhenotype. (type(unevaluated_phenotypes[{unevaluated_phenotype_id}]) = "
-                        "{unevaluated_phenotype.__class__})."
-                        .format(**locals()) ))
-
-        self.__unevaluated_phenotypes = unevaluated_phenotypes
 
     cpdef Py_ssize_t max_n_epochs(self) except *:
         return self.__max_n_epochs
 
     cpdef void set_max_n_epochs(self, Py_ssize_t max_n_epochs) except*:
-        if max_n_epochs < self.__n_epochs_elapsed:
+        cdef Py_ssize_t n_epochs_elapsed
+
+        n_epochs_elapsed = self.n_epochs_elapsed()
+
+        if max_n_epochs < n_epochs_elapsed:
             raise (
                 ValueError(
                     "The new maximum number of epochs (max_n_epochs = "
                     "{max_n_epochs}) must not be less than the current "
                     "number of epochs elapsed (self.n_epochs_elapsed() = "
-                    "{self.__n_epochs_elapsed})."
+                    "{n_epochs_elapsed})."
                     .format(**locals())))
 
         if max_n_epochs <= 0:
@@ -482,8 +410,8 @@ cdef void init_BaseEvolvingSystem(BaseEvolvingSystem system) except *:
     if system is None:
         raise TypeError("The system (system) cannot be None.")
 
-    system.__phenotypes = []
-    system.__unevaluated_phenotypes = []
+    system.__phenotypes = new_TypedList(BasePhenotype)
+    system.__unevaluated_phenotypes = new_TypedList(BasePhenotype)
     system.__best_phenotype = None
     system.__acting_phenotype = None
     system.__max_n_epochs = 1
@@ -513,11 +441,13 @@ cdef class DefaultEvolvingSystem:
         cdef DefaultPhenotype contender_b
         cdef double fitness_a
         cdef double fitness_b
+        cdef BaseWritableTypedList phenotypes_typed_list
         cdef list phenotypes
 
-        phenotypes = self._phenotypes()
+        phenotypes_typed_list = self.phenotypes()
+        phenotypes = phenotypes_typed_list.items_shallow_copy()
 
-        # TODO Optimize random shuffle with non-python random shuffle.
+        # TODO: Optimize random shuffle with non-python random shuffle.
         random.shuffle(phenotypes)
 
         for match_id in range(len(phenotypes)// 2):
@@ -531,92 +461,24 @@ cdef class DefaultEvolvingSystem:
             else:
                 phenotypes[2 * match_id] = contender_b.child()
 
-    cpdef void append_phenotype(self, phenotype) except *:
-        BaseEvolvingSystem.append_phenotype(self, <DefaultPhenotype?>phenotype)
+        phenotypes_typed_list.set_items(phenotypes)
 
-    cpdef void insert_phenotype(self, Py_ssize_t index, phenotype) except *:
-        BaseEvolvingSystem.insert_phenotype(
-            self,
-            index,
-            <DefaultPhenotype?>phenotype)
+    cpdef void set_phenotypes(self, phenotypes) except *:
+        cdef BaseWritableTypedList setting_phenotypes = (
+            <BaseWritableTypedList?> phenotypes)
+        cdef object phenotypes_item_type
 
-    cpdef void set_phenotype(self, Py_ssize_t index, phenotype) except *:
-        BaseEvolvingSystem.set_phenotype(self, index, <DefaultPhenotype?>phenotype)
+        phenotypes_item_type = setting_phenotypes.item_type()
 
-
-    cpdef void set_phenotypes(self, list phenotypes) except *:
-        cdef Py_ssize_t phenotype_id
-        cdef DefaultPhenotype phenotype
-
-        for phenotype_id in range(len(phenotypes)):
-            phenotype = phenotypes[phenotype_id]
-            if not isinstance(phenotype, DefaultPhenotype):
-                raise (
-                    TypeError(
-                        "All objects in (phenotypes) must be instances of "
-                        "DefaultPhenotype. (type(phenotypes[{phenotype_id}]) = "
-                        "{phenotype.__class__})."
-                        .format(**locals()) ))
+        if not is_sub_full_type(phenotypes_item_type, DefaultPhenotype):
+            raise (
+                TypeError(
+                    "The phenotype list's item type "
+                    "(phenotypes.item_type() = {phenotypes_item_type}) "
+                    "must be a subtype of DefaultPhenotype."
+                    .format(**locals())))
 
         BaseEvolvingSystem.set_phenotypes(self, phenotypes)
-
-    cpdef void _append_unevaluated_phenotype(
-            self,
-            unevaluated_phenotype) except *:
-        BaseEvolvingSystem._append_unevaluated_phenotype(
-            self,
-            <DefaultPhenotype?>unevaluated_phenotype)
-
-    cpdef void _insert_unevaluated_phenotype(
-            self,
-            Py_ssize_t index,
-            unevaluated_phenotype
-            ) except *:
-        BaseEvolvingSystem._insert_unevaluated_phenotype(
-            self,
-            index,
-            <DefaultPhenotype?>unevaluated_phenotype)
-
-    cpdef void _set_unevaluated_phenotype(
-            self,
-            Py_ssize_t index,
-            unevaluated_phenotype
-            ) except *:
-        BaseEvolvingSystem._set_unevaluated_phenotype(
-            self,
-            index,
-            <DefaultPhenotype?>unevaluated_phenotype)
-
-
-    cpdef void _set_unevaluated_phenotypes(
-            self,
-            list unevaluated_phenotypes
-            ) except *:
-        cdef Py_ssize_t unevaluated_phenotype_id
-        cdef DefaultPhenotype unevaluated_phenotype
-
-        for unevaluated_phenotype_id in range(len(unevaluated_phenotypes)):
-            unevaluated_phenotype = (
-                unevaluated_phenotypes[unevaluated_phenotype_id])
-            if not isinstance(unevaluated_phenotype, DefaultPhenotype):
-                raise (
-                    TypeError(
-                        "All objects in (unevaluated_phenotypes) must be "
-                        "instances of "
-                        "DefaultPhenotype. (type(unevaluated_phenotypes "
-                        "[{unevaluated_phenotype_id}]) = "
-                        "{unevaluated_phenotype.__class__})."
-                        .format(**locals()) ))
-
-        BaseEvolvingSystem._set_unevaluated_phenotypes(self, unevaluated_phenotypes)
-
-    cpdef void _set_best_phenotype(self, phenotype) except *:
-        BaseEvolvingSystem._set_best_phenotype(
-            self,<DefaultPhenotype?>phenotype)
-
-    cpdef void _set_acting_phenotype(self, phenotype) except *:
-        BaseEvolvingSystem._set_acting_phenotype(
-            self, <DefaultPhenotype?>phenotype)
 
 @cython.warn.undeclared(True)
 cdef DefaultEvolvingSystem new_DefaultEvolvingSystem():
@@ -633,6 +495,8 @@ cdef void init_DefaultEvolvingSystem(DefaultEvolvingSystem system) except *:
         raise TypeError("The system (system) cannot be None.")
 
     init_BaseEvolvingSystem(system)
+    system.__phenotypes = new_TypedList(DefaultPhenotype)
+    system.__unevaluated_phenotypes = new_TypedList(DefaultPhenotype)
 
 
 

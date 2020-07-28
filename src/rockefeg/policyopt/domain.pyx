@@ -3,7 +3,7 @@ cimport cython
 @cython.warn.undeclared(True)
 cdef class BaseDomain:
     cpdef copy(self, copy_obj = None):
-        raise NotImplementedError("Abstract method.")
+        pass
 
     cpdef void prep_for_epoch(self) except *:
         raise NotImplementedError("Abstract method.")
