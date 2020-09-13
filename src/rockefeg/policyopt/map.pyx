@@ -1,6 +1,7 @@
 cimport cython
 
 from rockefeg.cyutil.array cimport new_DoubleArray
+from .experience cimport ExperienceDatum
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -222,7 +223,7 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
         return (
             super_map.grad_wrt_parameters(
-                concatenate_state_action(input) ))
+                concatenate_state_action(input), output_grad))
 
     cpdef grad_wrt_input(self, input, output_grad = None):
         cdef BaseDifferentiableMap super_map
@@ -231,7 +232,7 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
         return (
             super_map.grad_wrt_input(
-                concatenate_state_action(input) ))
+                concatenate_state_action(input), output_grad))
 
     cpdef super_map(self):
         return self.__super_map
@@ -265,11 +266,10 @@ cdef void init_DifferentiableCriticMap(
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef DoubleArray concatenate_state_action(input):
-    cdef tuple cy_state_action_tuple
+    cdef ExperienceDatum cy_input
     cdef DoubleArray state
     cdef DoubleArray action
     cdef DoubleArray state_action
-    cdef Py_ssize_t input_len
     cdef Py_ssize_t n_state_dims
     cdef Py_ssize_t n_action_dims
     cdef Py_ssize_t id
@@ -277,18 +277,11 @@ cpdef DoubleArray concatenate_state_action(input):
     if isinstance(input, DoubleArray):
         return input
 
-    cy_state_action_tuple = <tuple?> input
-    input_len = len(cy_state_action_tuple)
+    cy_input = <ExperienceDatum?> input
 
-    if input_len != 2:
-        raise (
-            IndexError(
-                "The state-action tuple must have 2 elements "
-                "(len(input) = {input_len}) "
-                .format(**locals()) ))
 
-    state = <DoubleArray?>cy_state_action_tuple[0]
-    action = <DoubleArray?>cy_state_action_tuple[1]
+    state = <DoubleArray?>cy_input.state
+    action = <DoubleArray?>cy_input.action
 
     n_state_dims = len(state)
     n_action_dims = len(action)

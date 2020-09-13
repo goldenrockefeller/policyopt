@@ -16,6 +16,7 @@ cdef class Trial:
     cdef public object mod_name
     cdef public bint prints_score
     cdef public bint deletes_final_save_file
+    cdef public bint saves
     cdef public double save_period
     cdef public Py_ssize_t n_training_episodes_elapsed
     cdef public Py_ssize_t n_epochs_elapsed

@@ -1,6 +1,8 @@
 cimport cython
 from rockefeg.cyutil.array cimport DoubleArray, new_DoubleArray
 from rockefeg.cyutil.typed_list cimport BaseReadableTypedList, is_sub_full_type
+import numpy as np
+
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -162,7 +164,7 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
                         .format(**locals()) ))
             #
             for parameter_id in range(n_parameters):
-                sum_grad_wrt_parameters.view[parameter_id] -= (
+                sum_grad_wrt_parameters.view[parameter_id] += (
                     entry_grad_wrt_parameters.view[parameter_id]
                     * self.learning_rate()
                     / n_entries)
@@ -174,7 +176,6 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
 
         # Update the maps parameters.
         map.set_parameters(parameters)
-
 
     cpdef super_map(self):
         return self.__super_map

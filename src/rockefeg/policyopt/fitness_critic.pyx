@@ -95,8 +95,6 @@ cdef class FitnessCriticSystem(BaseSystem):
         cdef ExperienceDatum experience
         cdef BaseSystem system
 
-        # TODO: update fitness critic here
-
         n_batches = (
             self.n_critic_update_batches_per_epoch())
 
@@ -121,15 +119,17 @@ cdef class FitnessCriticSystem(BaseSystem):
                         critic_target_buffer.add_staged_datum(target_entry)
 
 
-            target_entry_list = [None] * batch_size
+                target_entry_list = [None] * batch_size
 
-            for target_id in range(batch_size):
-                target_entry = critic_target_buffer.next_shuffled_datum()
-                target_entry_list[target_id] = target_entry
+                for target_id in range(batch_size):
+                    target_entry = critic_target_buffer.next_shuffled_datum()
+                    target_entry_list[target_id] = target_entry
 
-            target_entries = new_TypedList(TargetEntry)
-            target_entries.set_items(target_entry_list)
-            intermediate_critic.batch_update(target_entries)
+                target_entries = new_TypedList(TargetEntry)
+                target_entries.set_items(target_entry_list)
+                intermediate_critic.batch_update(target_entries)
+
+            print(intermediate_critic.eval(trajectory.item(0)).view[0])
 
         system = self.super_system()
         system.prep_for_epoch()
@@ -171,18 +171,16 @@ cdef class FitnessCriticSystem(BaseSystem):
         experience.action = self.current_action()
         experience.reward = feedback
 
-        # TODO: encapsulate and type
+
         current_trajectory = self.current_trajectory()
         current_trajectory.append(experience)
 
-        new_feedback = (
-            intermediate_critic.eval(
-                (self.current_state(), self.current_action()) ).view[0])
+        new_feedback = intermediate_critic.eval(experience).view[0]
 
         if not isfinite(new_feedback):
             raise RuntimeError("Something went wrong: feedback is not finite.")
 
-        system.receive_feedback(new_feedback)
+        system.receive_feedback(new_feedback + experience.reward)
 
 
     cpdef void update_policy(self) except *:
@@ -194,10 +192,12 @@ cdef class FitnessCriticSystem(BaseSystem):
 
         trajectory_buffer = self.trajectory_buffer()
 
-        system .update_policy()
+        system.update_policy()
         current_trajectory = self.current_trajectory()
         trajectory_buffer.add_staged_datum(current_trajectory)
-        current_trajectory = new_TypedList(ExperienceDatum)
+        self.set_current_trajectory(new_TypedList(ExperienceDatum))
+
+
 
     cpdef void receive_score(self, score) except *:
         cdef BaseSystem system

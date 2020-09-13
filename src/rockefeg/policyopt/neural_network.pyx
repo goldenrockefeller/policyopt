@@ -31,6 +31,21 @@ cdef class ReluTanh(BaseDifferentiableMap):
     cpdef tuple shape(self):
         return (self.linear0[0].size(), self.bias0.size(), self.bias1.size())
 
+    cpdef Py_ssize_t n_parameters(self) except *:
+        cdef Py_ssize_t n_parameters
+
+        n_parameters = 0
+        n_parameters += (
+            self.linear0.size()
+            * self.linear0[0].size())
+        n_parameters += (
+            self.linear1.size()
+            * self.linear1[0].size())
+        n_parameters += self.bias0.size()
+        n_parameters += self.bias1.size()
+
+        return n_parameters
+
 
     cpdef parameters(self):
         cdef DoubleArray parameters
@@ -38,7 +53,7 @@ cdef class ReluTanh(BaseDifferentiableMap):
         cdef size_t i
         cdef size_t j
 
-        parameters = new_DoubleArray(n_parameters_for_ReluTanh(self))
+        parameters = new_DoubleArray(self.n_parameters())
         parameter_id = 0
 
         for i in range(self.linear0.size()):
@@ -70,7 +85,7 @@ cdef class ReluTanh(BaseDifferentiableMap):
         cdef size_t j
 
         n_setting_parameters = len(cy_parameters)
-        n_self_parameters = n_parameters_for_ReluTanh(self)
+        n_self_parameters = self.n_parameters()
 
         if n_setting_parameters != n_self_parameters:
             raise (
@@ -271,21 +286,7 @@ cdef void init_ReluTanh(
     for i in range(np_bias1.shape[0]):
         neural_network.bias1[i] = np_bias1[i]
 
-@cython.warn.undeclared(True)
-cpdef Py_ssize_t n_parameters_for_ReluTanh(ReluTanh neural_network):
-    cdef Py_ssize_t n_parameters
 
-    n_parameters = 0
-    n_parameters += (
-        neural_network.linear0.size()
-        * neural_network.linear0[0].size())
-    n_parameters += (
-        neural_network.linear1.size()
-        * neural_network.linear1[0].size())
-    n_parameters += neural_network.bias0.size()
-    n_parameters += neural_network.bias1.size()
-
-    return n_parameters
 
 def unpickle_ReluTanh(shape, parameters):
     neural_network = ReluTanh(shape[0], shape[1], shape[2])
@@ -296,17 +297,36 @@ def unpickle_ReluTanh(shape, parameters):
 
 @cython.warn.undeclared(True)
 cdef class ReluLinear(BaseDifferentiableMap):
-    def __init__(self, n_in_dims, n_hidden_neurons, n_out_dims):
+    def __init__(
+            self,
+            n_in_dims,
+            n_hidden_neurons,
+            n_out_dims,
+            linear1_is_fixed = False):
         init_ReluLinear(
             self,
             n_in_dims,
             n_hidden_neurons,
-            n_out_dims)
+            n_out_dims,
+            linear1_is_fixed)
 
     def __reduce__(self):
+        cdef DoubleArray all_parameters
+        cdef bint linear1_is_fixed
+
+        linear1_is_fixed = self.linear1_is_fixed
+        self.linear1_is_fixed = False
+        all_parameters = self.parameters()
+        self.linear1_is_fixed = linear1_is_fixed
+
         return (
             unpickle_ReluLinear,
-            (self.shape(), self.parameters(), self.leaky_scale))
+            (
+            self.shape(),
+            all_parameters,
+            self.leaky_scale,
+            self.linear1_is_fixed
+            ) )
 
     cpdef copy(self, copy_obj = None):
         cdef ReluLinear new_neural_network
@@ -321,11 +341,28 @@ cdef class ReluLinear(BaseDifferentiableMap):
         new_neural_network.bias0 = self.bias0
         new_neural_network.bias1 = self.bias1
         new_neural_network.leaky_scale = self.leaky_scale
+        new_neural_network.linear1_is_fixed = self.linear1_is_fixed
 
         return new_neural_network
 
     cpdef tuple shape(self):
         return (self.linear0[0].size(), self.bias0.size(), self.bias1.size())
+
+    cpdef Py_ssize_t n_parameters(self) except *:
+        cdef Py_ssize_t n_parameters
+
+        n_parameters = 0
+        n_parameters += (
+            self.linear0.size()
+            * self.linear0[0].size())
+        if not self.linear1_is_fixed:
+            n_parameters += (
+                self.linear1.size()
+                * self.linear1[0].size())
+        n_parameters += self.bias0.size()
+        n_parameters += self.bias1.size()
+
+        return n_parameters
 
 
     cpdef parameters(self):
@@ -334,7 +371,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
         cdef size_t i
         cdef size_t j
 
-        parameters = new_DoubleArray(n_parameters_for_ReluLinear(self))
+        parameters = new_DoubleArray(self.n_parameters())
         parameter_id = 0
 
         for i in range(self.linear0.size()):
@@ -346,10 +383,11 @@ cdef class ReluLinear(BaseDifferentiableMap):
             parameters.view[parameter_id]  = self.bias0[i]
             parameter_id += 1
 
-        for i in range(self.linear1.size()):
-            for j in range(self.linear1[i].size()):
-                parameters.view[parameter_id] = self.linear1[i][j]
-                parameter_id += 1
+        if not self.linear1_is_fixed:
+            for i in range(self.linear1.size()):
+                for j in range(self.linear1[i].size()):
+                    parameters.view[parameter_id] = self.linear1[i][j]
+                    parameter_id += 1
         #
         for i in range(self.bias1.size()):
             parameters.view[parameter_id]  = self.bias1[i]
@@ -366,7 +404,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
         cdef size_t j
 
         n_setting_parameters = len(cy_parameters)
-        n_self_parameters = n_parameters_for_ReluLinear(self)
+        n_self_parameters = self.n_parameters()
 
         if n_setting_parameters != n_self_parameters:
             raise (
@@ -388,10 +426,11 @@ cdef class ReluLinear(BaseDifferentiableMap):
             self.bias0[i] = cy_parameters.view[parameter_id]
             parameter_id += 1
 
-        for i in range(self.linear1.size()):
-            for j in range(self.linear1[0].size()):
-                self.linear1[i][j] = cy_parameters.view[parameter_id]
-                parameter_id += 1
+        if not self.linear1_is_fixed:
+            for i in range(self.linear1.size()):
+                for j in range(self.linear1[0].size()):
+                        self.linear1[i][j] = cy_parameters.view[parameter_id]
+                        parameter_id += 1
         #
         for i in range(self.bias1.size()):
             self.bias1[i] = cy_parameters.view[parameter_id]
@@ -542,12 +581,12 @@ cdef class ReluLinear(BaseDifferentiableMap):
 
         # Initialize sub-gradients w.r.t. parameters to the correct sizes.
         grad_wrt_linear0.resize(self.linear0.size())
-        for i in range(grad_wrt_linear0.size()):
-            grad_wrt_linear0[i].resize(self.linear0[i].size())
+        # for i in range(grad_wrt_linear0.size()):
+        #     grad_wrt_linear0[i].resize(self.linear0[i].size())
         #
         grad_wrt_linear1.resize(self.linear1.size())
-        for i in range(grad_wrt_linear1.size()):
-            grad_wrt_linear1[i].resize(self.linear1[i].size())
+        # for i in range(grad_wrt_linear1.size()):
+        #     grad_wrt_linear1[i].resize(self.linear1[i].size())
         #
         grad_wrt_bias0.resize(self.bias0.size())
         #
@@ -579,19 +618,23 @@ cdef class ReluLinear(BaseDifferentiableMap):
         grad_wrt_bias0 = grad_wrt_bias0_res
         #
         for i in range(self.linear1.size()):
-            for j in range(self.linear1[i].size()):
-                grad_wrt_linear1[i][j] = (
-                    output_grad_valarray[i]
-                    * relu_res[j])
+            grad_wrt_linear1[i] = output_grad_valarray[i] * relu_res
+            # for j in range(self.linear1[i].size()):
+            #     grad_wrt_linear1[i][j] = (
+            #         output_grad_valarray[i]
+            #         * relu_res[j])
         #
         for i in range(self.linear0.size()):
-            for j in range(self.linear0[i].size()):
-                grad_wrt_linear0[i][j] = (
-                    grad_wrt_bias0_res[i]
-                    * input_valarray[j])
+            grad_wrt_linear0[i] = grad_wrt_bias0_res[i] * input_valarray
+            # for j in range(self.linear0[i].size()):
+            #     grad_wrt_linear0[i][j] = (
+            #         grad_wrt_bias0_res[i]
+            #         * input_valarray[j])
+
+
 
         # Concatenate sub-gradient w.r.t. parameters into a single DoubleArray.
-        grad_wrt_parameters = new_DoubleArray(n_parameters_for_ReluLinear(self))
+        grad_wrt_parameters = new_DoubleArray(self.n_parameters())
         parameter_id = 0
         #
         for i in range(grad_wrt_linear0.size()):
@@ -603,10 +646,11 @@ cdef class ReluLinear(BaseDifferentiableMap):
             grad_wrt_parameters.view[parameter_id]  = grad_wrt_bias0[i]
             parameter_id += 1
 
-        for i in range(grad_wrt_linear1.size()):
-            for j in range(grad_wrt_linear1[i].size()):
-                grad_wrt_parameters.view[parameter_id] = grad_wrt_linear1[i][j]
-                parameter_id += 1
+        if not self.linear1_is_fixed:
+            for i in range(grad_wrt_linear1.size()):
+                for j in range(grad_wrt_linear1[i].size()):
+                    grad_wrt_parameters.view[parameter_id] = grad_wrt_linear1[i][j]
+                    parameter_id += 1
         #
         for i in range(grad_wrt_bias1.size()):
             grad_wrt_parameters.view[parameter_id]  = grad_wrt_bias1[i]
@@ -719,7 +763,8 @@ cdef class ReluLinear(BaseDifferentiableMap):
 cdef ReluLinear new_ReluLinear(
         Py_ssize_t n_in_dims,
         Py_ssize_t n_hidden_neurons,
-        Py_ssize_t n_out_dims):
+        Py_ssize_t n_out_dims,
+        bint linear1_is_fixed = False):
     cdef ReluLinear neural_network
 
     neural_network = ReluLinear.__new__(ReluLinear)
@@ -727,7 +772,8 @@ cdef ReluLinear new_ReluLinear(
         neural_network,
         n_in_dims,
         n_hidden_neurons,
-        n_out_dims)
+        n_out_dims,
+        linear1_is_fixed)
 
     return neural_network
 
@@ -736,7 +782,8 @@ cdef void init_ReluLinear(
         ReluLinear neural_network,
         Py_ssize_t n_in_dims,
         Py_ssize_t n_hidden_neurons,
-        Py_ssize_t n_out_dims
+        Py_ssize_t n_out_dims,
+        bint linear1_is_fixed = False
         ) except *:
     cdef double in_stdev
     cdef double hidden_stdev
@@ -749,6 +796,8 @@ cdef void init_ReluLinear(
 
     if neural_network is None:
         raise TypeError("The neural network (neural_network) cannot be None.")
+
+    neural_network.linear1_is_fixed = linear1_is_fixed
 
     if n_in_dims <= 0:
         raise (
@@ -809,6 +858,8 @@ cdef void init_ReluLinear(
         neural_network.linear1[i].resize(np_linear1.shape[1])
         for j in range(np_linear1.shape[1]):
             neural_network.linear1[i][j] = np_linear1[i, j]
+            if linear1_is_fixed:
+                 neural_network.linear1[i][j] = 1.
     #
     neural_network.bias0.resize(np_bias0.shape[0])
     for i in range(np_bias0.shape[0]):
@@ -822,26 +873,664 @@ cdef void init_ReluLinear(
     # Set the leaky scale for the ReluLinear.
     neural_network.leaky_scale = 0.
 
-@cython.warn.undeclared(True)
-cpdef Py_ssize_t n_parameters_for_ReluLinear(ReluLinear neural_network):
-    cdef Py_ssize_t n_parameters
 
-    n_parameters = 0
-    n_parameters += (
-        neural_network.linear0.size()
-        * neural_network.linear0[0].size())
-    n_parameters += (
-        neural_network.linear1.size()
-        * neural_network.linear1[0].size())
-    n_parameters += neural_network.bias0.size()
-    n_parameters += neural_network.bias1.size()
 
-    return n_parameters
-
-def unpickle_ReluLinear(shape, parameters, leaky_scale):
+def unpickle_ReluLinear(shape, parameters, leaky_scale, linear1_is_fixed):
     neural_network = ReluLinear(shape[0], shape[1], shape[2])
+    neural_network.linear1_is_fixed = False
     neural_network.set_parameters(parameters)
     neural_network.leaky_scale = leaky_scale
+    neural_network.linear1_is_fixed = linear1_is_fixed
 
+
+    return neural_network
+
+
+@cython.warn.undeclared(True)
+cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
+    def __init__(
+            self,
+            n_in_dims,
+            n_centers,
+            n_out_dims):
+        init_Rbfn(
+            self,
+            n_in_dims,
+            n_centers,
+            n_out_dims)
+
+    def __reduce__(self):
+        cdef DoubleArray all_parameters
+        cdef bint scalings_are_fixed
+
+        scalings_are_fixed = self.scalings_are_fixed
+        self.scalings_are_fixed = False
+        all_parameters = self.parameters()
+        self.scalings_are_fixed = scalings_are_fixed
+
+        return (
+            unpickle_Rbfn,
+            (
+            self.shape(),
+            all_parameters,
+            self.scalings_are_fixed,
+            self.normalizes_weights
+            ) )
+
+
+    cpdef copy(self, copy_obj = None):
+        cdef Rbfn new_neural_network
+
+        if copy_obj is None:
+            new_neural_network = Rbfn.__new__(Rbfn)
+        else:
+            new_neural_network = copy_obj
+
+        new_neural_network.centers = self.centers
+        new_neural_network.scalings = self.scalings
+        new_neural_network.transform = self.transform
+        new_neural_network.scalings_are_fixed = self.scalings_are_fixed
+        new_neural_network.normalizes_weights = self.normalizes_weights
+
+        return new_neural_network
+
+    cpdef tuple shape(self):
+        return (
+            self.centers[0].size(),
+            self.centers.size(),
+            self.transform.size())
+
+    cpdef Py_ssize_t n_parameters(self) except *:
+        cdef Py_ssize_t n_parameters
+
+        n_parameters = 0
+
+
+        n_parameters += (
+            self.centers.size()
+            * self.centers[0].size())
+        if not self.scalings_are_fixed:
+            n_parameters += (
+                self.scalings.size()
+                * self.scalings[0].size())
+        n_parameters += (
+            self.transform.size()
+            * self.transform[0].size())
+        return n_parameters
+
+    cpdef parameters(self):
+        cdef DoubleArray parameters
+        cdef Py_ssize_t parameter_id
+        cdef size_t i
+        cdef size_t j
+
+        parameters = new_DoubleArray(self.n_parameters())
+        parameter_id = 0
+
+        for i in range(self.centers.size()):
+            for j in range(self.centers[i].size()):
+                parameters.view[parameter_id] = self.centers[i][j]
+                parameter_id += 1
+        #
+        if not self.scalings_are_fixed:
+            for i in range(self.scalings.size()):
+                for j in range(self.scalings[i].size()):
+                    parameters.view[parameter_id] = self.scalings[i][j]
+                    parameter_id += 1
+        #
+        for i in range(self.transform.size()):
+            for j in range(self.transform[i].size()):
+                parameters.view[parameter_id] = self.transform[i][j]
+                parameter_id += 1
+
+        return parameters
+
+    cpdef void set_parameters(self, parameters) except *:
+        cdef DoubleArray cy_parameters = <DoubleArray?> parameters
+        cdef Py_ssize_t n_setting_parameters
+        cdef Py_ssize_t n_self_parameters
+        cdef Py_ssize_t parameter_id
+        cdef size_t i
+        cdef size_t j
+
+        n_setting_parameters = len(cy_parameters)
+        n_self_parameters = self.n_parameters()
+
+        if n_setting_parameters != n_self_parameters:
+            raise (
+                ValueError(
+                    "The number of setting parameters "
+                    "(len(parameters)={n_setting_parameters}) "
+                    "must be equal to the number of neural network parameters "
+                    "(len(self.parameters())={n_self_parameters})."
+                    .format(**locals())))
+
+        parameter_id = 0
+
+
+        for i in range(self.centers.size()):
+            for j in range(self.centers[0].size()):
+                self.centers[i][j] = cy_parameters.view[parameter_id]
+                parameter_id += 1
+        #
+        if not self.scalings_are_fixed:
+            for i in range(self.scalings.size()):
+                for j in range(self.scalings[0].size()):
+                    self.scalings[i][j] = cy_parameters.view[parameter_id]
+                    parameter_id += 1
+        #
+        for i in range(self.transform.size()):
+            for j in range(self.transform[0].size()):
+                self.transform[i][j] = cy_parameters.view[parameter_id]
+                parameter_id += 1
+
+    cpdef weights_eval(self, input):
+        cdef DoubleArray eval
+        cdef double eval_sum
+
+        eval = rbfn_pre_norm_weights_eval(self, input)
+
+        if self.normalizes_weights:
+            eval = normalization_for_DoubleArray(eval)
+
+        return eval
+
+    cpdef eval(self, input):
+        cdef DoubleArray cy_input = <DoubleArray?> input
+        cdef DoubleArray eval
+        cdef DoubleArray weights
+        cdef Py_ssize_t self_n_in_dims
+        cdef Py_ssize_t input_size
+        cdef valarray[double] input_valarray
+        cdef valarray[double] weights_valarray
+        cdef valarray[double] transform_res
+        cdef size_t i
+        cdef Py_ssize_t input_id
+        cdef Py_ssize_t eval_id
+
+        input_size = len(cy_input)
+        self_n_in_dims = self.centers[0].size()
+
+        if input_size != self_n_in_dims:
+            raise (
+                ValueError(
+                    "The input size (len(input)={input_size}) "
+                    "must be equal to the neural network's number of "
+                    "input dimensions (self.shape()[0] = {self_n_in_dims})."
+                    .format(**locals())))
+
+        input_valarray.resize(input_size)
+        for input_id in range(input_size):
+            input_valarray[<size_t>input_id] = cy_input.view[input_id]
+
+        eval = new_DoubleArray(self.transform.size())
+
+        weights = self.weights_eval(input)
+        weights_valarray.resize(len(weights))
+        for eval_id in range(len(weights)):
+            weights_valarray[<size_t>eval_id] = weights.view[eval_id]
+
+        transform_res.resize(self.transform.size())
+        for i in range(transform_res.size()):
+            transform_res[i] = (self.transform[i]*weights_valarray).sum()
+
+        for eval_id in range(len(eval)):
+            eval.view[eval_id] = transform_res[<size_t>eval_id]
+
+        return eval
+
+    cpdef jacobian_wrt_parameters(self, input):
+        return default_jacobian_wrt_parameters(self, input)
+
+    cpdef jacobian_wrt_input(self, input):
+        return default_jacobian_wrt_input(self, input)
+
+    cpdef grad_wrt_parameters(self, input, output_grad = None):
+        cdef DoubleArray cy_input = <DoubleArray?> input
+        cdef DoubleArray cy_output_grad
+        cdef DoubleArray grad_wrt_parameters
+        cdef DoubleArray pre_norm_weights
+        cdef DoubleArray weights
+        cdef vector[valarray[double]] grad_wrt_centers
+        cdef vector[valarray[double]] grad_wrt_scalings
+        cdef vector[valarray[double]] grad_wrt_transform
+        cdef valarray[double] pre_norm_weights_valarray
+        cdef valarray[double] weights_valarray
+        cdef valarray[double] output_grad_valarray
+        cdef valarray[double] input_valarray
+        cdef valarray[double] grad_wrt_pre_norm_weights_res
+        cdef valarray[double] grad_wrt_weights_eval
+        cdef valarray[double] separation_res
+        cdef valarray[double] scaling_res
+        cdef Py_ssize_t input_size
+        cdef Py_ssize_t self_n_in_dims
+        cdef Py_ssize_t output_grad_size
+        cdef Py_ssize_t self_n_out_dims
+        cdef Py_ssize_t input_id
+        cdef Py_ssize_t output_grad_id
+        cdef Py_ssize_t parameter_id
+        cdef Py_ssize_t eval_id
+        cdef size_t i
+        cdef size_t j
+
+        self_n_in_dims = self.centers[0].size()
+        self_n_out_dims = self.transform.size()
+
+
+        input_size = len(cy_input)
+        if input_size != self_n_in_dims:
+            raise (
+                ValueError(
+                    "The input size (len(input)={input_size}) "
+                    "must be equal to the neural network's number of "
+                    "input dimensions (self.shape()[0] = {self_n_in_dims})."
+                    .format(**locals())))
+
+        # Convert the input argument to valarray for convenience.
+        input_valarray.resize(input_size)
+        for input_id in range(input_size):
+            input_valarray[<size_t>input_id] = cy_input.view[input_id]
+
+        if output_grad is None:
+            # Use a default output gradient set to a vector of 1.'s;
+            output_grad_size = self_n_out_dims
+            output_grad_valarray.resize(output_grad_size)
+            output_grad_valarray = 1.
+        else:
+            # Check if the output gradient argument is valid and then
+            # convert the output gradient argument to valarray  for convenience.
+            cy_output_grad = <DoubleArray?> output_grad
+            output_grad_size = len(cy_output_grad)
+            #
+            if output_grad_size != self_n_out_dims:
+                    raise (
+                        ValueError(
+                            "The output gradient size "
+                            "(len(output_grad)={output_grad_size}) "
+                            "must be equal to the neural network's number of "
+                            "output dimensions "
+                            "(self.shape()[2] = {self_n_out_dims})."
+                            .format(**locals())))
+            #
+            output_grad_valarray.resize(output_grad_size)
+            for output_grad_id in range(output_grad_size):
+                output_grad_valarray[<size_t>output_grad_id] = (
+                    cy_output_grad.view[output_grad_id])
+
+        # Get intermediate evaluation results that are needed to calculate the
+        # gradient.
+        pre_norm_weights = rbfn_pre_norm_weights_eval(self, input)
+        pre_norm_weights_valarray.resize(len(pre_norm_weights))
+        for eval_id in range(len(pre_norm_weights)):
+            pre_norm_weights_valarray[<size_t>eval_id] = (
+                pre_norm_weights.view[eval_id])
+        #
+        weights = pre_norm_weights
+        if self.normalizes_weights:
+            weights = normalization_for_DoubleArray(pre_norm_weights)
+        weights_valarray.resize(len(weights))
+        for eval_id in range(len(weights)):
+            weights_valarray[<size_t>eval_id] = (
+                weights.view[eval_id])
+
+
+
+        # Initialize sub-gradients w.r.t. parameters to the correct sizes.
+        grad_wrt_centers.resize(self.centers.size())
+        # for i in range(grad_wrt_centers.size()):
+        #     grad_wrt_centers[i].resize(self.centers[i].size())
+        #
+        grad_wrt_scalings.resize(self.scalings.size())
+        # for i in range(grad_wrt_scalings.size()):
+        #     grad_wrt_scalings[i].resize(self.scalings[i].size())
+        #
+        grad_wrt_transform.resize(self.transform.size())
+        # for i in range(grad_wrt_transform.size()):
+        #     grad_wrt_transform[i].resize(self.transform[i].size())
+        #
+
+
+        # Calculate intermediate gradients.
+        grad_wrt_weights_eval.resize(self.transform[0].size())
+        grad_wrt_weights_eval = 0.
+        for i in range(self.transform.size()):
+            grad_wrt_weights_eval = (
+                grad_wrt_weights_eval
+                + output_grad_valarray[i]
+                * self.transform[i] )
+        #
+        grad_wrt_pre_norm_weights_res = grad_wrt_weights_eval
+        if self.normalizes_weights:
+            grad_wrt_pre_norm_weights_res = (
+                (
+                grad_wrt_pre_norm_weights_res
+                - (grad_wrt_weights_eval * weights_valarray).sum()
+                )
+                / pre_norm_weights_valarray.sum())
+
+        # Calculate sub-gradient w.r.t. parameters.
+        for i in range(self.transform.size()):
+            grad_wrt_transform[i] = output_grad_valarray[i] * weights_valarray
+        #
+        for i in range(self.centers.size()):
+            separation_res = self.centers[i] - input_valarray
+            scaling_res =  self.scalings[i] * separation_res
+            grad_wrt_centers[i] = (
+                -2.
+                * grad_wrt_pre_norm_weights_res[i]
+                * pre_norm_weights_valarray[i]
+                * pre_norm_weights_valarray[i]
+                * scaling_res
+                * self.scalings[i] )
+            grad_wrt_scalings[i] = (
+                -2.
+                * grad_wrt_pre_norm_weights_res[i]
+                * pre_norm_weights_valarray[i]
+                * pre_norm_weights_valarray[i]
+                * scaling_res
+                * separation_res )
+
+
+        # Concatenate sub-gradient w.r.t. parameters into a single DoubleArray.
+        grad_wrt_parameters = new_DoubleArray(self.n_parameters())
+        parameter_id = 0
+        #
+        for i in range(self.centers.size()):
+            for j in range(self.centers[i].size()):
+                grad_wrt_parameters.view[parameter_id] = grad_wrt_centers[i][j]
+                parameter_id += 1
+        #
+        if not self.scalings_are_fixed:
+            for i in range(self.scalings.size()):
+                for j in range(self.scalings[i].size()):
+                    grad_wrt_parameters.view[parameter_id] = grad_wrt_scalings[i][j]
+                    parameter_id += 1
+        #
+        for i in range(self.transform.size()):
+            for j in range(self.transform[i].size()):
+                grad_wrt_parameters.view[parameter_id] = grad_wrt_transform[i][j]
+                parameter_id += 1
+
+        return grad_wrt_parameters
+
+    cpdef grad_wrt_input(self, input, output_grad = None):
+        cdef DoubleArray cy_input = <DoubleArray?> input
+        cdef DoubleArray cy_output_grad
+        cdef DoubleArray grad_wrt_input
+        cdef DoubleArray pre_norm_weights
+        cdef DoubleArray weights
+        cdef valarray[double] pre_norm_weights_valarray
+        cdef valarray[double] weights_valarray
+        cdef valarray[double] output_grad_valarray
+        cdef valarray[double] input_valarray
+        cdef valarray[double] grad_wrt_pre_norm_weights_res
+        cdef valarray[double] grad_wrt_weights_eval
+        cdef valarray[double] separation_res
+        cdef valarray[double] scaling_res
+        cdef valarray[double] grad_wrt_input_valarray
+        cdef Py_ssize_t input_size
+        cdef Py_ssize_t self_n_in_dims
+        cdef Py_ssize_t output_grad_size
+        cdef Py_ssize_t self_n_out_dims
+        cdef Py_ssize_t input_id
+        cdef Py_ssize_t output_grad_id
+        cdef Py_ssize_t parameter_id
+        cdef Py_ssize_t eval_id
+        cdef size_t i
+        cdef size_t j
+
+        self_n_in_dims = self.centers[0].size()
+        self_n_out_dims = self.transform.size()
+
+
+        input_size = len(cy_input)
+        if input_size != self_n_in_dims:
+            raise (
+                ValueError(
+                    "The input size (len(input)={input_size}) "
+                    "must be equal to the neural network's number of "
+                    "input dimensions (self.shape()[0] = {self_n_in_dims})."
+                    .format(**locals())))
+
+        # Convert the input argument to valarray for convenience.
+        input_valarray.resize(input_size)
+        for input_id in range(input_size):
+            input_valarray[<size_t>input_id] = cy_input.view[input_id]
+
+        if output_grad is None:
+            # Use a default output gradient set to a vector of 1.'s;
+            output_grad_size = self_n_out_dims
+            output_grad_valarray.resize(output_grad_size)
+            output_grad_valarray = 1.
+        else:
+            # Check if the output gradient argument is valid and then
+            # convert the output gradient argument to valarray  for convenience.
+            cy_output_grad = <DoubleArray?> output_grad
+            output_grad_size = len(cy_output_grad)
+            #
+            if output_grad_size != self_n_out_dims:
+                    raise (
+                        ValueError(
+                            "The output gradient size "
+                            "(len(output_grad)={output_grad_size}) "
+                            "must be equal to the neural network's number of "
+                            "output dimensions "
+                            "(self.shape()[2] = {self_n_out_dims})."
+                            .format(**locals())))
+            #
+            output_grad_valarray.resize(output_grad_size)
+            for output_grad_id in range(output_grad_size):
+                output_grad_valarray[<size_t>output_grad_id] = (
+                    cy_output_grad.view[output_grad_id])
+
+        # Get intermediate evaluation results that are needed to calculate the
+        # gradient.
+        pre_norm_weights = rbfn_pre_norm_weights_eval(self, input)
+        pre_norm_weights_valarray.resize(len(pre_norm_weights))
+        for eval_id in range(len(pre_norm_weights)):
+            pre_norm_weights_valarray[<size_t>eval_id] = (
+                pre_norm_weights.view[eval_id])
+        #
+        weights = pre_norm_weights
+        if self.normalizes_weights:
+            weights = normalization_for_DoubleArray(pre_norm_weights)
+        weights_valarray.resize(len(weights))
+        for eval_id in range(len(weights)):
+            weights_valarray[<size_t>eval_id] = (
+                weights.view[eval_id])
+
+        # Calculate intermediate gradients.
+        grad_wrt_weights_eval.resize(self.transform[0].size())
+        grad_wrt_weights_eval = 0.
+        for i in range(self.transform.size()):
+            grad_wrt_weights_eval = (
+                grad_wrt_weights_eval
+                + output_grad_valarray[i]
+                * self.transform[i] )
+        #
+        grad_wrt_pre_norm_weights_res = grad_wrt_weights_eval
+        if self.normalizes_weights:
+            grad_wrt_pre_norm_weights_res = (
+                (
+                grad_wrt_pre_norm_weights_res
+                - (grad_wrt_weights_eval * weights_valarray).sum()
+                )
+                / pre_norm_weights_valarray.sum())
+
+        # Concatenate sub-gradient w.r.t. input into a single DoubleArray.
+        grad_wrt_input_valarray.resize(self.centers[0].size())
+        grad_wrt_input_valarray = 0.
+        for i in range(self.centers.size()):
+            separation_res = self.centers[i] - input_valarray
+            scaling_res =  self.scalings[i] * separation_res
+            grad_wrt_input_valarray = (
+                2.
+                * grad_wrt_pre_norm_weights_res[i]
+                * pre_norm_weights_valarray[i]
+                * pre_norm_weights_valarray[i]
+                * self.scalings[i]
+                * scaling_res
+                + grad_wrt_input_valarray
+                )
+        #
+        grad_wrt_input = new_DoubleArray(input_size)
+        for input_id in range(input_size):
+            grad_wrt_input.view[input_id] = (
+                grad_wrt_input_valarray[<size_t>input_id])
+
+        return grad_wrt_input
+
+
+
+@cython.warn.undeclared(True)
+cdef Rbfn new_Rbfn(
+        Py_ssize_t n_in_dims,
+        Py_ssize_t n_centers,
+        Py_ssize_t n_out_dims):
+    cdef Rbfn neural_network
+
+    neural_network = Rbfn.__new__(Rbfn)
+    init_Rbfn(
+        neural_network,
+        n_in_dims,
+        n_centers,
+        n_out_dims)
+
+    return neural_network
+
+@cython.warn.undeclared(True)
+cdef void init_Rbfn(
+        Rbfn neural_network,
+        Py_ssize_t n_in_dims,
+        Py_ssize_t n_centers,
+        Py_ssize_t n_out_dims,
+        ) except *:
+    cdef Py_ssize_t i
+    cdef Py_ssize_t j
+    cdef double[:, ::1] np_centers
+    cdef double[:, ::1] np_transform
+
+    if neural_network is None:
+        raise TypeError("The neural network (neural_network) cannot be None.")
+
+    neural_network.scalings_are_fixed = False
+    neural_network.normalizes_weights = True
+
+    if n_in_dims <= 0:
+        raise (
+            ValueError(
+                "The number of input dimensions (n_in_dims = {n_in_dims}) "
+                "must be positive."
+                .format(**locals())))
+
+    if n_centers <= 0:
+        raise (
+            ValueError(
+                "The number of centers (n_centers = {n_centers}) "
+                "must be positive."
+                .format(**locals())))
+
+    if n_out_dims <= 0:
+        raise (
+            ValueError(
+                "The number of output dimensions (n_out_dims = {n_out_dims}) "
+                "must be positive."
+                .format(**locals())))
+
+    # Get initialization matrices for the transform layer using numpy.
+    np_centers= (
+        np.random.uniform(
+            -1.,
+            1.,
+            (n_centers, n_in_dims) ))
+
+    np_transform= (
+        np.random.uniform(
+            -1.,
+            1.,
+            (n_out_dims, n_centers) ))
+
+    # Copy initialization matrices data into neural network's fields.
+    neural_network.centers.resize(np_centers.shape[0])
+    for i in range(np_centers.shape[0]):
+        neural_network.centers[i].resize(np_centers.shape[1])
+        for j in range(np_centers.shape[1]):
+            neural_network.centers[i][j] = np_centers[i, j]
+    #
+    neural_network.scalings.resize(np_centers.shape[0])
+    for i in range(np_centers.shape[0]):
+        neural_network.scalings[i].resize(np_centers.shape[1])
+        for j in range(np_centers.shape[1]):
+            neural_network.scalings[i][j] = 1.
+    #
+    neural_network.transform.resize(np_transform.shape[0])
+    for i in range(np_transform.shape[0]):
+        neural_network.transform[i].resize(np_transform.shape[1])
+        for j in range(np_transform.shape[1]):
+            neural_network.transform[i][j] = np_transform[i, j]
+
+@cython.warn.undeclared(True)
+cpdef DoubleArray rbfn_pre_norm_weights_eval(Rbfn self, DoubleArray input):
+    cdef DoubleArray eval
+    cdef Py_ssize_t self_n_in_dims
+    cdef Py_ssize_t input_size
+    cdef valarray[double] input_valarray
+    cdef valarray[double] scaling_res
+    cdef valarray[double] separation_res
+    cdef valarray[double] scaling_res_sqr
+    cdef double dist_sqr
+    cdef size_t i
+    cdef Py_ssize_t input_id
+    cdef Py_ssize_t eval_id
+
+    input_size = len(input)
+    self_n_in_dims = self.centers[0].size()
+
+    if input_size != self_n_in_dims:
+        raise (
+            ValueError(
+                "The input size (len(input)={input_size}) "
+                "must be equal to the neural network's number of "
+                "input dimensions (self.shape()[0] = {self_n_in_dims})."
+                .format(**locals())))
+
+    input_valarray.resize(input_size)
+    for input_id in range(input_size):
+        input_valarray[<size_t>input_id] = input.view[input_id]
+
+    eval = new_DoubleArray(self.centers.size())
+
+    for i in range(self.centers.size()):
+        separation_res = self.centers[i] - input_valarray
+        scaling_res =  self.scalings[i] * separation_res
+        scaling_res_sqr = scaling_res * scaling_res
+        dist_sqr = scaling_res_sqr.sum()
+        # Inverse quadratic radial basis function:
+        eval.view[<Py_ssize_t>i] = 1. / (1. + dist_sqr)
+
+    return eval
+
+@cython.warn.undeclared(True)
+cpdef DoubleArray normalization_for_DoubleArray(DoubleArray arr):
+    cdef double arr_sum
+    cdef Py_ssize_t i
+    cdef DoubleArray normalized_arr
+
+    normalized_arr = new_DoubleArray(len(arr))
+
+    arr_sum = 0.
+    for i in range(len(arr)):
+        arr_sum += arr.view[i]
+    for i in range(len(arr)):
+        normalized_arr.view[i] = arr.view[i] / arr_sum
+
+    return normalized_arr
+
+def unpickle_Rbfn(shape, parameters, scalings_are_fixed, normalizes_weights):
+    neural_network = Rbfn(shape[0], shape[1], shape[2])
+    neural_network.scalings_are_fixed = False
+    neural_network.set_parameters(parameters)
+    neural_network.scalings_are_fixed = scalings_are_fixed
+    neural_network.normalizes_weights = normalizes_weights
 
     return neural_network

@@ -46,6 +46,8 @@ cdef class Trial:
         # Save period in seconds. 
         py_save_period = args.get("save_period",  dt.timedelta(minutes = 10))
         self.save_period = py_save_period.total_seconds()
+        
+        self.saves = args.get("saves",  True)
             
             
         self.n_training_episodes_elapsed = 0
@@ -70,23 +72,24 @@ cdef class Trial:
         cdef object exc
         cdef object save_file
         
-        save_filename = (
-            os.path.join(
-                self.log_dirname, 
-                self.mod_name,
-                "save",
-                "trail_save_{self.datetime_str}.pickle".format(**locals())))
-        
-        # Create File Directory if it doesn't exist.
-        if not os.path.exists(os.path.dirname(save_filename)):
-            try:
-                os.makedirs(os.path.dirname(save_filename))
-            except OSError as exc: # Guard against race condition
-                if exc.errno != errno.EEXIST:
-                    raise
+        if self.saves:
+            save_filename = (
+                os.path.join(
+                    self.log_dirname, 
+                    self.mod_name,
+                    "save",
+                    "trail_save_{self.datetime_str}.pickle".format(**locals())))
             
-        with open(save_filename, 'wb') as save_file:
-            pickle.dump(self, save_file) 
+            # Create File Directory if it doesn't exist.
+            if not os.path.exists(os.path.dirname(save_filename)):
+                try:
+                    os.makedirs(os.path.dirname(save_filename))
+                except OSError as exc: # Guard against race condition
+                    if exc.errno != errno.EEXIST:
+                        raise
+                
+            with open(save_filename, 'wb') as save_file:
+                pickle.dump(self, save_file) 
     
     @staticmethod        
     def load(object save_filename):
@@ -101,15 +104,16 @@ cdef class Trial:
     cpdef void delete_final_save_file(self) except *:
         cdef object save_filename
         
-        save_filename = (
-            os.path.join(
-                self.log_dirname, 
-                self.mod_name,
-                "save",
-                "trail_save_{self.datetime_str}.pickle".format(**locals())))
-        
-        if os.path.exists(save_filename):    
-            os.remove(save_filename) 
+        if self.saves:
+            save_filename = (
+                os.path.join(
+                    self.log_dirname, 
+                    self.mod_name,
+                    "save",
+                    "trail_save_{self.datetime_str}.pickle".format(**locals())))
+            
+            if os.path.exists(save_filename):    
+                os.remove(save_filename) 
         
     cpdef void log_score_history(self) except *:
         cdef object save_filename
@@ -174,7 +178,8 @@ cdef class Trial:
         system = self.system
         domain = self.domain
         
-        self.save()
+        if self.saves:
+            self.save()
         time(&last_save_time)
         
         while not system.is_done_training():
@@ -241,7 +246,8 @@ cdef class Trial:
             
             time(&current_time)
             if difftime(current_time, last_save_time) > self.save_period:
-                self.save()
+                if self.saves:
+                    self.save()
                 time(&last_save_time)
         
 
@@ -257,7 +263,7 @@ cdef class Trial:
                 self.mod_name),
             self.datetime_str)
         
-        if self.deletes_final_save_file:
+        if self.deletes_final_save_file and self.saves:
             self.delete_final_save_file()
         
         

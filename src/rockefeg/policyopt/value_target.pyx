@@ -27,32 +27,6 @@ cpdef DoubleArray concatenation_of_DoubleArray(
 
     return concatenation
 
-@cython.warn.undeclared(True)
-cpdef list state_actions_from_path(path):
-    cdef BaseReadableTypedList path_cy = <BaseReadableTypedList?> path
-    cdef ExperienceDatum experience
-    cdef Py_ssize_t experience_id
-    cdef list state_actions
-    cdef object path_item_type
-
-    path_item_type = path_cy.item_type()
-
-    if not is_sub_full_type(path_item_type, ExperienceDatum):
-        raise (
-            TypeError(
-                "The path list's item type "
-                "(path.item_type() = {path_item_type}) "
-                "must be a subtype of ExperienceDatum."
-                .format(**locals())))
-
-
-    state_actions = [None] * len(path_cy)
-
-    for experience_id in range(len(path_cy)):
-        experience = path_cy.item(experience_id)
-        state_actions[experience_id] = (experience.state, experience.action)
-
-    return state_actions
 
 @cython.warn.undeclared(True)
 cpdef DoubleArray rewards_from_path(path):
@@ -82,22 +56,36 @@ cpdef DoubleArray rewards_from_path(path):
 
 @cython.warn.undeclared(True)
 cpdef DoubleArray q_value_evals(
-        list state_actions,
+        BaseReadableTypedList path,
         BaseMap critic):
-    cdef object state_action
-    cdef Py_ssize_t state_action_id
+    cdef ExperienceDatum experience
+    cdef Py_ssize_t experience_id
     cdef DoubleArray q_values
     cdef DoubleArray critic_eval_array
+    cdef object path_item_type
+
+    if path is None:
+        raise TypeError("The path (path) cannot be None.")
 
     if critic is None:
         raise TypeError("The critic (critic) cannot be None.")
 
-    q_values = new_DoubleArray(len(state_actions))
+    path_item_type =  path.item_type()
 
-    for state_action_id in range(len(state_actions)):
-        state_action = state_actions[state_action_id]
-        critic_eval_array = critic.eval(state_action)
-        q_values.view[state_action_id] = critic_eval_array.view[0]
+    if not is_sub_full_type(path.item_type(), ExperienceDatum):
+        raise (
+            TypeError(
+                "The path list's item type "
+                "(path.item_type() = {path_item_type}) "
+                "must be a subtype of ExperienceDatum."
+                .format(**locals())))
+
+    q_values = new_DoubleArray(len(path))
+
+    for experience_id in range(len(path)):
+        experience = path.item(experience_id)
+        critic_eval_array = critic.eval(experience)
+        q_values.view[experience_id] = critic_eval_array.view[0]
 
     return q_values
 
@@ -161,9 +149,6 @@ cpdef DoubleArray sarsa_q_update_evals(
             * next_q_value )
 
     return q_updates
-
-
-
 
 @cython.warn.undeclared(True)
 cpdef DoubleArray trace_convolution_while_redistributing_tail(
@@ -374,26 +359,40 @@ cpdef DoubleArray tail_subtracted_trace(
 
 @cython.warn.undeclared(True)
 cpdef value_target_entries(
-        list state_actions,
+        BaseReadableTypedList path,
         DoubleArray target_values):
     cdef TypedList entries_typed_list
     cdef list entries
     cdef Py_ssize_t entry_id
     cdef DoubleArray target
     cdef TargetEntry target_entry
+    cdef object path_item_type
+
+    if path is None:
+        raise TypeError("The path (path) cannot be None.")
 
     if target_values is None:
         raise (
             TypeError(
                 "The target values vector (target_values) cannot be None."))
 
-    entries = [None] * len(state_actions)
+    path_item_type =  path.item_type()
+
+    if not is_sub_full_type(path.item_type(), ExperienceDatum):
+        raise (
+            TypeError(
+                "The path list's item type "
+                "(path.item_type() = {path_item_type}) "
+                "must be a subtype of ExperienceDatum."
+                .format(**locals())))
+
+    entries = [None] * len(path)
 
     for entry_id in range(len(entries)):
         target = new_DoubleArray(1)
         target.view[0] = target_values.view[entry_id]
         target_entry = new_TargetEntry()
-        target_entry.input = state_actions[entry_id]
+        target_entry.input = path.item(entry_id)
         target_entry.target = target
         entries[entry_id] = target_entry
 
@@ -434,7 +433,6 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
         cdef Py_ssize_t experience_id
         cdef list value_target_entries_list
         cdef BaseReadableTypedList value_target_entries_ret
-        cdef list state_actions
         cdef DoubleArray target_values
         cdef double total_reward
         cdef ExperienceDatum experience #
@@ -455,13 +453,12 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
         for experience in path_cy:
             total_reward += experience.reward
 
-        state_actions = state_actions_from_path(path_cy)
         target_values = new_DoubleArray(len(path_cy))
         target_values.set_all_to(total_reward)
 
         value_target_entries_ret = (
             value_target_entries(
-                state_actions,
+                path,
                 target_values ))
 
         return value_target_entries_ret
@@ -524,7 +521,6 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
         cdef DoubleArray target_updates
         cdef DoubleArray target_values
         cdef BaseReadableTypedList value_target_entries_ret
-        cdef list state_actions
         cdef Py_ssize_t trace_len
         cdef Py_ssize_t target_id
         cdef Py_ssize_t path_len
@@ -567,10 +563,9 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
         #
         trace = self.trace(trace_len)
 
-        state_actions = state_actions_from_path(path_cy)
         rewards = rewards_from_path(path_cy)
 
-        q_values = q_value_evals(state_actions, self.critic())
+        q_values = q_value_evals(path, self.critic())
 
         q_updates = (
             sarsa_q_update_evals(
@@ -594,7 +589,7 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
 
         value_target_entries_ret = (
             value_target_entries(
-                state_actions,
+                path,
                 target_values ))
 
         return value_target_entries_ret
@@ -722,7 +717,6 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
         cdef DoubleArray target_updates
         cdef DoubleArray target_values
         cdef BaseReadableTypedList value_target_entries_ret
-        cdef list state_actions
         cdef Py_ssize_t trace_len
         cdef Py_ssize_t target_id
         cdef Py_ssize_t path_len
@@ -769,10 +763,9 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
             #
             trace = self.trace(trace_len)
 
-            state_actions = state_actions_from_path(path_cy)
             rewards = rewards_from_path(path_cy)
 
-            q_values = q_value_evals(state_actions, self.critic())
+            q_values = q_value_evals(path, self.critic())
 
             q_updates = (
                 sarsa_q_update_evals(
@@ -797,7 +790,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
 
             value_target_entries_ret = (
                 value_target_entries(
-                    state_actions,
+                    path,
                     target_values ))
 
             return value_target_entries_ret
@@ -932,7 +925,6 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
         cdef DoubleArray target_updates
         cdef DoubleArray target_values
         cdef BaseReadableTypedList value_target_entries_ret
-        cdef list state_actions
         cdef Py_ssize_t trace_len
         cdef Py_ssize_t target_id
         cdef Py_ssize_t path_len
@@ -979,10 +971,9 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
             #
             trace = self.trace(trace_len)
 
-            state_actions = state_actions_from_path(path_cy)
             rewards = rewards_from_path(path_cy)
 
-            q_values = q_value_evals(state_actions, self.critic())
+            q_values = q_value_evals(path, self.critic())
 
             q_updates = (
                 sarsa_q_update_evals(
@@ -1007,7 +998,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
 
             value_target_entries_ret = (
                 value_target_entries(
-                    state_actions,
+                    path,
                     target_values ))
 
             return value_target_entries_ret
