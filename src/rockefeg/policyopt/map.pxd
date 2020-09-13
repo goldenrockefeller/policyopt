@@ -5,6 +5,7 @@ cdef class BaseMap:
 
     cpdef parameters(self)
     cpdef void set_parameters(self, parameters) except *
+    cpdef Py_ssize_t n_parameters(self) except *
 
     cpdef eval(self, input)
 

@@ -74,6 +74,13 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
 
         super_map.set_parameters(parameters)
 
+    cpdef Py_ssize_t n_parameters(self) except *:
+        cdef BaseDifferentiableMap super_map
+
+        super_map = self.super_map()
+
+        return super_map.n_parameters()
+
     cpdef eval(self, input):
         cdef BaseMap super_map
 
@@ -114,7 +121,7 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         map = self.super_map()
         parameters = map.parameters()
         parameters = parameters.copy()
-        n_parameters = len(parameters)
+        n_parameters = map.n_parameters()
         sum_grad_wrt_parameters = new_DoubleArray(n_parameters)
         sum_grad_wrt_parameters.set_all_to(0.)
         n_entries = len(entries_cy)

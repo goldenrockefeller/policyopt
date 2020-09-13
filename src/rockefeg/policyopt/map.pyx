@@ -16,8 +16,12 @@ cdef class BaseMap:
     cpdef void set_parameters(self, parameters) except *:
         raise NotImplementedError("Abstract method.")
 
+    cpdef Py_ssize_t n_parameters(self) except *:
+        raise NotImplementedError("Abstract method.")
+
     cpdef eval(self, input):
         raise NotImplementedError("Abstract method.")
+
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -119,6 +123,13 @@ cdef class ContinuousCriticMap(BaseMap):
 
         super_map.set_parameters(parameters)
 
+    cpdef Py_ssize_t n_parameters(self) except *:
+        cdef BaseMap super_map
+
+        super_map = self.super_map()
+
+        return super_map.n_parameters()
+
 
     cpdef eval(self, input):
         cdef BaseMap super_map
@@ -189,7 +200,14 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
         super_map = self.super_map()
 
-        (<BaseDifferentiableMap?>self.__super_map).set_parameters(parameters)
+        super_map.set_parameters(parameters)
+
+    cpdef Py_ssize_t n_parameters(self) except *:
+        cdef BaseDifferentiableMap super_map
+
+        super_map = self.super_map()
+
+        return super_map.n_parameters()
 
     cpdef eval(self, input):
         cdef BaseDifferentiableMap super_map
