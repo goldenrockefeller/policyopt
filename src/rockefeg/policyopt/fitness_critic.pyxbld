@@ -5,4 +5,4 @@ def make_ext(modname, pyxfilename):
 
 # import numpy
 # def make_setup_args():
-#     return dict(include_dirs=[numpy.get_include()])
+#     return dict(include_dirs=[np.get_include()])
