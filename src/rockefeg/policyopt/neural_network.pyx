@@ -1,3 +1,5 @@
+# distutils: extra_compile_args = -mavx2 -mfma -ftree-vectorize
+
 cimport cython
 from libc cimport math as cmath
 from rockefeg.cyutil.array cimport DoubleArray, new_DoubleArray

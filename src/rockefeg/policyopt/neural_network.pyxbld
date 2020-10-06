@@ -2,17 +2,11 @@ from Cython.Build import cythonize
 import os
 
 def make_ext(modname, pyxfilename):
-    c_flags_exist = 'CFLAGS' in os.environ
-    if c_flags_exist:
-        c_flags = os.environ['CFLAGS']
-    os.environ['CFLAGS'] = '-O0'
     exts = (
         cythonize(
             pyxfilename,
             language_level = 3,
             annotate = True))
-    if c_flags_exist:
-        os.environ['CFLAGS'] = c_flags
     return exts[0]
 
 # import numpy
