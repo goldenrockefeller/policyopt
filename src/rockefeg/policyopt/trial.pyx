@@ -1,4 +1,5 @@
 cimport cython
+from time import perf_counter
 from libc.time cimport time_t, time, difftime
 
 import datetime as dt
@@ -178,6 +179,8 @@ cdef class Trial:
         system = self.system
         domain = self.domain
         
+        start = perf_counter()
+        
         if self.saves:
             self.save()
         time(&last_save_time)
@@ -249,6 +252,10 @@ cdef class Trial:
                 if self.saves:
                     self.save()
                 time(&last_save_time)
+            end = perf_counter()
+            
+            print(end-start)
+            start = end
         
 
         self.log_score_history()

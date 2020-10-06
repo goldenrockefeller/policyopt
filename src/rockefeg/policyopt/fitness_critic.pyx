@@ -180,7 +180,7 @@ cdef class FitnessCriticSystem(BaseSystem):
         if not isfinite(new_feedback):
             raise RuntimeError("Something went wrong: feedback is not finite.")
 
-        system.receive_feedback(new_feedback + experience.reward)
+        system.receive_feedback(new_feedback)
 
 
     cpdef void update_policy(self) except *:

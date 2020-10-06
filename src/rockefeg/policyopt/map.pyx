@@ -281,8 +281,7 @@ cdef void init_DifferentiableCriticMap(
 
     map.__super_map = super_map
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
+
 cpdef DoubleArray concatenate_state_action(input):
     cdef ExperienceDatum cy_input
     cdef DoubleArray state

@@ -2,171 +2,63 @@ cimport cython
 from libc cimport math as cmath
 from rockefeg.cyutil.array cimport DoubleArray, new_DoubleArray
 from .map cimport default_jacobian_wrt_parameters, default_jacobian_wrt_input
+from libc.math cimport tanh
 
 import numpy as np
 
 @cython.warn.undeclared(True)
-cdef class ReluTanh(BaseDifferentiableMap):
-    def __init__(self, n_in_dims, n_hidden_neurons, n_out_dims):
-        init_ReluTanh(self, n_in_dims, n_hidden_neurons, n_out_dims)
+cdef class TanhLayer(BaseDifferentiableMap):
+    def __init__(self, BaseDifferentiableMap super_map):
+        init_TanhLayer(self, super_map)
 
     def __reduce__(self):
-        return unpickle_ReluTanh, (self.shape(), self.parameters())
+        return unpickle_TanhLayer, (self.super_map)
 
     cpdef copy(self, copy_obj = None):
-        cdef ReluTanh new_neural_network
+        cdef TanhLayer new_neural_network
 
         if copy_obj is None:
-            new_neural_network = ReluTanh.__new__(ReluTanh)
+            new_neural_network = TanhLayer.__new__(TanhLayer)
         else:
             new_neural_network = copy_obj
 
-        new_neural_network.linear0 = self.linear0
-        new_neural_network.linear1 = self.linear1
-        new_neural_network.bias0 = self.bias0
-        new_neural_network.bias1 = self.bias1
+        new_neural_network.super_map = self.super_map.copy()
 
         return new_neural_network
 
-    cpdef tuple shape(self):
-        return (self.linear0[0].size(), self.bias0.size(), self.bias1.size())
 
     cpdef Py_ssize_t n_parameters(self) except *:
-        cdef Py_ssize_t n_parameters
+        cdef BaseDifferentiableMap super_map
 
-        n_parameters = 0
-        n_parameters += (
-            self.linear0.size()
-            * self.linear0[0].size())
-        n_parameters += (
-            self.linear1.size()
-            * self.linear1[0].size())
-        n_parameters += self.bias0.size()
-        n_parameters += self.bias1.size()
+        super_map = self.super_map
 
-        return n_parameters
+        return super_map.n_parameters()
 
 
     cpdef parameters(self):
-        cdef DoubleArray parameters
-        cdef Py_ssize_t parameter_id
-        cdef size_t i
-        cdef size_t j
+        cdef BaseDifferentiableMap super_map
 
-        parameters = new_DoubleArray(self.n_parameters())
-        parameter_id = 0
+        super_map = self.super_map
 
-        for i in range(self.linear0.size()):
-            for j in range(self.linear0[i].size()):
-                parameters.view[parameter_id] = self.linear0[i][j]
-                parameter_id += 1
-        #
-        for i in range(self.bias0.size()):
-            parameters.view[parameter_id]  = self.bias0[i]
-            parameter_id += 1
-
-        for i in range(self.linear1.size()):
-            for j in range(self.linear1[i].size()):
-                parameters.view[parameter_id] = self.linear1[i][j]
-                parameter_id += 1
-        #
-        for i in range(self.bias1.size()):
-            parameters.view[parameter_id]  = self.bias1[i]
-            parameter_id += 1
-
-        return parameters
+        return super_map.parameters()
 
     cpdef void set_parameters(self, parameters) except *:
-        cdef DoubleArray cy_parameters = <DoubleArray?> parameters
-        cdef Py_ssize_t n_setting_parameters
-        cdef Py_ssize_t n_self_parameters
-        cdef Py_ssize_t parameter_id
-        cdef size_t i
-        cdef size_t j
+        cdef BaseDifferentiableMap super_map
 
-        n_setting_parameters = len(cy_parameters)
-        n_self_parameters = self.n_parameters()
+        super_map = self.super_map
 
-        if n_setting_parameters != n_self_parameters:
-            raise (
-                ValueError(
-                    "The number of setting parameters "
-                    "(len(parameters)={n_setting_parameters}) "
-                    "must be equal to the number of neural network parameters "
-                    "(len(self.parameters())={n_self_parameters})."
-                    .format(**locals())))
-
-        parameter_id = 0
-
-        for i in range(self.linear0.size()):
-            for j in range(self.linear0[0].size()):
-                self.linear0[i][j] = cy_parameters.view[parameter_id]
-                parameter_id += 1
-        #
-        for i in range(self.bias0.size()):
-            self.bias0[i] = cy_parameters.view[parameter_id]
-            parameter_id += 1
-
-        for i in range(self.linear1.size()):
-            for j in range(self.linear1[0].size()):
-                self.linear1[i][j] = cy_parameters.view[parameter_id]
-                parameter_id += 1
-        #
-        for i in range(self.bias1.size()):
-            self.bias1[i] = cy_parameters.view[parameter_id]
-            parameter_id += 1
+        super_map.set_parameters(parameters)
 
     cpdef eval(self, input):
-        cdef DoubleArray cy_input = <DoubleArray?> input
+        cdef BaseDifferentiableMap super_map
         cdef DoubleArray eval
-        cdef Py_ssize_t self_n_in_dims
-        cdef Py_ssize_t input_size
-        cdef valarray[double] input_valarray
-        cdef valarray[double] linear0_res
-        cdef valarray[double] bias0_res
-        cdef valarray[double] relu_res
-        cdef valarray[double] linear1_res
-        cdef valarray[double] bias1_res
-        cdef valarray[double] tanh_res
-        cdef size_t i
-        cdef Py_ssize_t input_id
         cdef Py_ssize_t eval_id
 
-        input_size = len(cy_input)
-        self_n_in_dims = self.linear0[0].size()
+        super_map = self.super_map
 
-        if input_size != self_n_in_dims:
-            raise (
-                ValueError(
-                    "The input size (len(input)={input_size}) "
-                    "must be equal to the neural network's number of "
-                    "input dimensions (= {self_n_in_dims})."
-                    .format(**locals())))
-
-        input_valarray.resize(input_size)
-        for input_id in range(input_size):
-            input_valarray[<size_t>input_id] = cy_input.view[input_id]
-
-        linear0_res.resize(self.linear0.size())
-        for i in range(linear0_res.size()):
-            linear0_res[i] = (self.linear0[i]*input_valarray).sum()
-
-        bias0_res = linear0_res + self.bias0
-
-        relu_res.resize(bias0_res.size())
-        for i in range(relu_res.size()):
-            relu_res[i] = bias0_res[i] * (bias0_res[i] > 0.)
-
-        linear1_res.resize(self.linear1.size())
-        for i in range(linear1_res.size()):
-            linear1_res[i] = (self.linear1[i]*relu_res).sum()
-
-        bias1_res = linear1_res + self.bias1
-        tanh_res = tanh(bias1_res)
-        eval = new_DoubleArray(bias1_res.size())
-
+        eval = super_map.eval(input)
         for eval_id in range(len(eval)):
-            eval.view[eval_id] = tanh_res[<size_t>eval_id]
+            eval.view[eval_id] = tanh(eval.view[eval_id])
 
         return eval
 
@@ -185,112 +77,26 @@ cdef class ReluTanh(BaseDifferentiableMap):
         raise NotImplementedError("Not implmented yet")
 
 
-
-
 @cython.warn.undeclared(True)
-cdef ReluTanh new_ReluTanh(
-        Py_ssize_t n_in_dims,
-        Py_ssize_t n_hidden_neurons,
-        Py_ssize_t n_out_dims):
-    cdef ReluTanh neural_network
+cdef TanhLayer new_TanhLayer(BaseDifferentiableMap super_map):
+    cdef TanhLayer neural_network
 
-    neural_network = ReluTanh.__new__(ReluTanh)
-    init_ReluTanh(neural_network, n_in_dims, n_hidden_neurons, n_out_dims)
+    neural_network = TanhLayer.__new__(TanhLayer)
+    init_TanhLayer(neural_network, super_map)
 
     return neural_network
 
 @cython.warn.undeclared(True)
-cdef void init_ReluTanh(
-        ReluTanh neural_network,
-        Py_ssize_t n_in_dims,
-        Py_ssize_t n_hidden_neurons,
-        Py_ssize_t n_out_dims
+cdef void init_TanhLayer(
+        TanhLayer neural_network,
+        BaseDifferentiableMap super_map
         ) except *:
-    cdef double in_stdev
-    cdef double hidden_stdev
-    cdef Py_ssize_t i
-    cdef Py_ssize_t j
-    cdef double[:, ::1] np_linear0
-    cdef double[:, ::1] np_linear1
-    cdef double[::1] np_bias0
-    cdef double[::1] np_bias1
-
-    if neural_network is None:
-        raise TypeError("The neural network (neural_network) cannot be None.")
-
-    if n_in_dims <= 0:
-        raise (
-            ValueError(
-                "The number of input dimensions (n_in_dims = {n_in_dims}) "
-                "must be positive."
-                .format(**locals())))
-
-    if n_hidden_neurons <= 0:
-        raise (
-            ValueError(
-                "The number of hidden neurons "
-                "(n_hidden_neurons = {n_hidden_neurons}) "
-                "must be positive."
-                .format(**locals())))
-
-    if n_out_dims <= 0:
-        raise (
-            ValueError(
-                "The number of output dimensions (n_out_dims = {n_out_dims}) "
-                "must be positive."
-                .format(**locals())))
-
-    # Get initialization matrices using numpy.
-    in_stdev =  cmath.sqrt(3./ n_in_dims)
-    np_linear0 = (
-        np.random.uniform(
-            -in_stdev,
-            in_stdev,
-            (n_hidden_neurons, n_in_dims) ))
-    np_bias0 = (
-        np.random.uniform(
-            -in_stdev,
-            in_stdev,
-            n_hidden_neurons))
-    #
-    hidden_stdev = cmath.sqrt(3./ n_hidden_neurons)
-    np_linear1 =  (
-        np.random.uniform(
-            -hidden_stdev,
-            hidden_stdev,
-            (n_out_dims, n_hidden_neurons) ))
-    np_bias1 = (
-        np.random.uniform(
-            -hidden_stdev,
-            hidden_stdev,
-            n_out_dims))
-
-    # Copy initialization matrices data into ReluTanh fields.
-    neural_network.linear0.resize(np_linear0.shape[0])
-    for i in range(np_linear0.shape[0]):
-        neural_network.linear0[i].resize(np_linear0.shape[1])
-        for j in range(np_linear0.shape[1]):
-            neural_network.linear0[i][j] = np_linear0[i, j]
-    #
-    neural_network.linear1.resize(np_linear1.shape[0])
-    for i in range(np_linear1.shape[0]):
-        neural_network.linear1[i].resize(np_linear1.shape[1])
-        for j in range(np_linear1.shape[1]):
-            neural_network.linear1[i][j] = np_linear1[i, j]
-    #
-    neural_network.bias0.resize(np_bias0.shape[0])
-    for i in range(np_bias0.shape[0]):
-        neural_network.bias0[i] = np_bias0[i]
-    #
-    neural_network.bias1.resize(np_bias1.shape[0])
-    for i in range(np_bias1.shape[0]):
-        neural_network.bias1[i] = np_bias1[i]
+    neural_network.super_map = super_map
 
 
 
-def unpickle_ReluTanh(shape, parameters):
-    neural_network = ReluTanh(shape[0], shape[1], shape[2])
-    neural_network.set_parameters(parameters)
+def unpickle_TanhLayer(super_map):
+    neural_network = TanhLayer(super_map)
 
     return neural_network
 
@@ -543,7 +349,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
             # Use a default output gradient set to a vector of 1.'s;
             output_grad_size = self_n_out_dims
             output_grad_valarray.resize(output_grad_size)
-            output_grad_valarray = 1.
+            assign_valarray_to_double(output_grad_valarray, 1.)
         else:
             # Check if the output gradient argument is valid and then
             # convert the output gradient argument to valarray  for convenience.
@@ -697,7 +503,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
         if output_grad is None:
             output_grad_size = self_n_out_dims
             output_grad_valarray.resize(output_grad_size)
-            output_grad_valarray = 1.
+            assign_valarray_to_double(output_grad_valarray, 1.)
         else:
             cy_output_grad = <DoubleArray?> output_grad
             output_grad_size = len(cy_output_grad)
@@ -743,7 +549,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
                 * self.leaky_scale )
 
         grad_wrt_input_valarray.resize(self.linear0[0].size())
-        grad_wrt_input_valarray = 0.
+        assign_valarray_to_double(grad_wrt_input_valarray, 0.)
         for i in range(self.linear0.size()):
             grad_wrt_input_valarray = (
                 grad_wrt_input_valarray
@@ -914,7 +720,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
             self.shape(),
             all_parameters,
             self.scalings_are_fixed,
-            self.normalizes_weights
+            self.normalizes_activations
             ) )
 
 
@@ -930,7 +736,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
         new_neural_network.scalings = self.scalings
         new_neural_network.transform = self.transform
         new_neural_network.scalings_are_fixed = self.scalings_are_fixed
-        new_neural_network.normalizes_weights = self.normalizes_weights
+        new_neural_network.normalizes_activations = self.normalizes_activations
 
         return new_neural_network
 
@@ -1024,13 +830,13 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
                 self.transform[i][j] = cy_parameters.view[parameter_id]
                 parameter_id += 1
 
-    cpdef weights_eval(self, input):
+    cpdef activations_eval(self, input):
         cdef DoubleArray eval
         cdef double eval_sum
 
-        eval = rbfn_pre_norm_weights_eval(self, input)
+        eval = rbfn_pre_norm_activations_eval(self, input)
 
-        if self.normalizes_weights:
+        if self.normalizes_activations:
             eval = normalization_for_DoubleArray(eval)
 
         return eval
@@ -1038,11 +844,11 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
     cpdef eval(self, input):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray eval
-        cdef DoubleArray weights
+        cdef DoubleArray activations
         cdef Py_ssize_t self_n_in_dims
         cdef Py_ssize_t input_size
         cdef valarray[double] input_valarray
-        cdef valarray[double] weights_valarray
+        cdef valarray[double] activations_valarray
         cdef valarray[double] transform_res
         cdef size_t i
         cdef Py_ssize_t input_id
@@ -1065,14 +871,14 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
         eval = new_DoubleArray(self.transform.size())
 
-        weights = self.weights_eval(input)
-        weights_valarray.resize(len(weights))
-        for eval_id in range(len(weights)):
-            weights_valarray[<size_t>eval_id] = weights.view[eval_id]
+        activations = self.activations_eval(input)
+        activations_valarray.resize(len(activations))
+        for eval_id in range(len(activations)):
+            activations_valarray[<size_t>eval_id] = activations.view[eval_id]
 
         transform_res.resize(self.transform.size())
         for i in range(transform_res.size()):
-            transform_res[i] = (self.transform[i]*weights_valarray).sum()
+            transform_res[i] = (self.transform[i]*activations_valarray).sum()
 
         for eval_id in range(len(eval)):
             eval.view[eval_id] = transform_res[<size_t>eval_id]
@@ -1089,17 +895,17 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray cy_output_grad
         cdef DoubleArray grad_wrt_parameters
-        cdef DoubleArray pre_norm_weights
-        cdef DoubleArray weights
+        cdef DoubleArray pre_norm_activations
+        cdef DoubleArray activations
         cdef vector[valarray[double]] grad_wrt_centers
         cdef vector[valarray[double]] grad_wrt_scalings
         cdef vector[valarray[double]] grad_wrt_transform
-        cdef valarray[double] pre_norm_weights_valarray
-        cdef valarray[double] weights_valarray
+        cdef valarray[double] pre_norm_activations_valarray
+        cdef valarray[double] activations_valarray
         cdef valarray[double] output_grad_valarray
         cdef valarray[double] input_valarray
-        cdef valarray[double] grad_wrt_pre_norm_weights_res
-        cdef valarray[double] grad_wrt_weights_eval
+        cdef valarray[double] grad_wrt_pre_norm_activations_res
+        cdef valarray[double] grad_wrt_activations_eval
         cdef valarray[double] separation_res
         cdef valarray[double] scaling_res
         cdef Py_ssize_t input_size
@@ -1135,7 +941,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
             # Use a default output gradient set to a vector of 1.'s;
             output_grad_size = self_n_out_dims
             output_grad_valarray.resize(output_grad_size)
-            output_grad_valarray = 1.
+            assign_valarray_to_double(output_grad_valarray, 1.)
         else:
             # Check if the output gradient argument is valid and then
             # convert the output gradient argument to valarray  for convenience.
@@ -1159,19 +965,19 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
         # Get intermediate evaluation results that are needed to calculate the
         # gradient.
-        pre_norm_weights = rbfn_pre_norm_weights_eval(self, input)
-        pre_norm_weights_valarray.resize(len(pre_norm_weights))
-        for eval_id in range(len(pre_norm_weights)):
-            pre_norm_weights_valarray[<size_t>eval_id] = (
-                pre_norm_weights.view[eval_id])
+        pre_norm_activations = rbfn_pre_norm_activations_eval(self, input)
+        pre_norm_activations_valarray.resize(len(pre_norm_activations))
+        for eval_id in range(len(pre_norm_activations)):
+            pre_norm_activations_valarray[<size_t>eval_id] = (
+                pre_norm_activations.view[eval_id])
         #
-        weights = pre_norm_weights
-        if self.normalizes_weights:
-            weights = normalization_for_DoubleArray(pre_norm_weights)
-        weights_valarray.resize(len(weights))
-        for eval_id in range(len(weights)):
-            weights_valarray[<size_t>eval_id] = (
-                weights.view[eval_id])
+        activations = pre_norm_activations
+        if self.normalizes_activations:
+            activations = normalization_for_DoubleArray(pre_norm_activations)
+        activations_valarray.resize(len(activations))
+        for eval_id in range(len(activations)):
+            activations_valarray[<size_t>eval_id] = (
+                activations.view[eval_id])
 
 
 
@@ -1191,42 +997,42 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
 
         # Calculate intermediate gradients.
-        grad_wrt_weights_eval.resize(self.transform[0].size())
-        grad_wrt_weights_eval = 0.
+        grad_wrt_activations_eval.resize(self.transform[0].size())
+        assign_valarray_to_double(grad_wrt_activations_eval, 0.)
         for i in range(self.transform.size()):
-            grad_wrt_weights_eval = (
-                grad_wrt_weights_eval
+            grad_wrt_activations_eval = (
+                grad_wrt_activations_eval
                 + output_grad_valarray[i]
                 * self.transform[i] )
         #
-        grad_wrt_pre_norm_weights_res = grad_wrt_weights_eval
-        if self.normalizes_weights:
-            grad_wrt_pre_norm_weights_res = (
+        grad_wrt_pre_norm_activations_res = grad_wrt_activations_eval
+        if self.normalizes_activations:
+            grad_wrt_pre_norm_activations_res = (
                 (
-                grad_wrt_pre_norm_weights_res
-                - (grad_wrt_weights_eval * weights_valarray).sum()
+                grad_wrt_pre_norm_activations_res
+                - (grad_wrt_activations_eval * activations_valarray).sum()
                 )
-                / pre_norm_weights_valarray.sum())
+                / pre_norm_activations_valarray.sum())
 
         # Calculate sub-gradient w.r.t. parameters.
         for i in range(self.transform.size()):
-            grad_wrt_transform[i] = output_grad_valarray[i] * weights_valarray
+            grad_wrt_transform[i] = output_grad_valarray[i] * activations_valarray
         #
         for i in range(self.centers.size()):
             separation_res = self.centers[i] - input_valarray
             scaling_res =  self.scalings[i] * separation_res
             grad_wrt_centers[i] = (
                 -2.
-                * grad_wrt_pre_norm_weights_res[i]
-                * pre_norm_weights_valarray[i]
-                * pre_norm_weights_valarray[i]
+                * grad_wrt_pre_norm_activations_res[i]
+                * pre_norm_activations_valarray[i]
+                * pre_norm_activations_valarray[i]
                 * scaling_res
                 * self.scalings[i] )
             grad_wrt_scalings[i] = (
                 -2.
-                * grad_wrt_pre_norm_weights_res[i]
-                * pre_norm_weights_valarray[i]
-                * pre_norm_weights_valarray[i]
+                * grad_wrt_pre_norm_activations_res[i]
+                * pre_norm_activations_valarray[i]
+                * pre_norm_activations_valarray[i]
                 * scaling_res
                 * separation_res )
 
@@ -1257,14 +1063,14 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray cy_output_grad
         cdef DoubleArray grad_wrt_input
-        cdef DoubleArray pre_norm_weights
-        cdef DoubleArray weights
-        cdef valarray[double] pre_norm_weights_valarray
-        cdef valarray[double] weights_valarray
+        cdef DoubleArray pre_norm_activations
+        cdef DoubleArray activations
+        cdef valarray[double] pre_norm_activations_valarray
+        cdef valarray[double] activations_valarray
         cdef valarray[double] output_grad_valarray
         cdef valarray[double] input_valarray
-        cdef valarray[double] grad_wrt_pre_norm_weights_res
-        cdef valarray[double] grad_wrt_weights_eval
+        cdef valarray[double] grad_wrt_pre_norm_activations_res
+        cdef valarray[double] grad_wrt_activations_eval
         cdef valarray[double] separation_res
         cdef valarray[double] scaling_res
         cdef valarray[double] grad_wrt_input_valarray
@@ -1301,7 +1107,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
             # Use a default output gradient set to a vector of 1.'s;
             output_grad_size = self_n_out_dims
             output_grad_valarray.resize(output_grad_size)
-            output_grad_valarray = 1.
+            assign_valarray_to_double(output_grad_valarray, 1.)
         else:
             # Check if the output gradient argument is valid and then
             # convert the output gradient argument to valarray  for convenience.
@@ -1325,49 +1131,49 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
         # Get intermediate evaluation results that are needed to calculate the
         # gradient.
-        pre_norm_weights = rbfn_pre_norm_weights_eval(self, input)
-        pre_norm_weights_valarray.resize(len(pre_norm_weights))
-        for eval_id in range(len(pre_norm_weights)):
-            pre_norm_weights_valarray[<size_t>eval_id] = (
-                pre_norm_weights.view[eval_id])
+        pre_norm_activations = rbfn_pre_norm_activations_eval(self, input)
+        pre_norm_activations_valarray.resize(len(pre_norm_activations))
+        for eval_id in range(len(pre_norm_activations)):
+            pre_norm_activations_valarray[<size_t>eval_id] = (
+                pre_norm_activations.view[eval_id])
         #
-        weights = pre_norm_weights
-        if self.normalizes_weights:
-            weights = normalization_for_DoubleArray(pre_norm_weights)
-        weights_valarray.resize(len(weights))
-        for eval_id in range(len(weights)):
-            weights_valarray[<size_t>eval_id] = (
-                weights.view[eval_id])
+        activations = pre_norm_activations
+        if self.normalizes_activations:
+            activations = normalization_for_DoubleArray(pre_norm_activations)
+        activations_valarray.resize(len(activations))
+        for eval_id in range(len(activations)):
+            activations_valarray[<size_t>eval_id] = (
+                activations.view[eval_id])
 
         # Calculate intermediate gradients.
-        grad_wrt_weights_eval.resize(self.transform[0].size())
-        grad_wrt_weights_eval = 0.
+        grad_wrt_activations_eval.resize(self.transform[0].size())
+        assign_valarray_to_double(grad_wrt_activations_eval, 0.)
         for i in range(self.transform.size()):
-            grad_wrt_weights_eval = (
-                grad_wrt_weights_eval
+            grad_wrt_activations_eval = (
+                grad_wrt_activations_eval
                 + output_grad_valarray[i]
                 * self.transform[i] )
         #
-        grad_wrt_pre_norm_weights_res = grad_wrt_weights_eval
-        if self.normalizes_weights:
-            grad_wrt_pre_norm_weights_res = (
+        grad_wrt_pre_norm_activations_res = grad_wrt_activations_eval
+        if self.normalizes_activations:
+            grad_wrt_pre_norm_activations_res = (
                 (
-                grad_wrt_pre_norm_weights_res
-                - (grad_wrt_weights_eval * weights_valarray).sum()
+                grad_wrt_pre_norm_activations_res
+                - (grad_wrt_activations_eval * activations_valarray).sum()
                 )
-                / pre_norm_weights_valarray.sum())
+                / pre_norm_activations_valarray.sum())
 
         # Concatenate sub-gradient w.r.t. input into a single DoubleArray.
         grad_wrt_input_valarray.resize(self.centers[0].size())
-        grad_wrt_input_valarray = 0.
+        assign_valarray_to_double(grad_wrt_input_valarray, 0.)
         for i in range(self.centers.size()):
             separation_res = self.centers[i] - input_valarray
             scaling_res =  self.scalings[i] * separation_res
             grad_wrt_input_valarray = (
                 2.
-                * grad_wrt_pre_norm_weights_res[i]
-                * pre_norm_weights_valarray[i]
-                * pre_norm_weights_valarray[i]
+                * grad_wrt_pre_norm_activations_res[i]
+                * pre_norm_activations_valarray[i]
+                * pre_norm_activations_valarray[i]
                 * self.scalings[i]
                 * scaling_res
                 + grad_wrt_input_valarray
@@ -1414,7 +1220,7 @@ cdef void init_Rbfn(
         raise TypeError("The neural network (neural_network) cannot be None.")
 
     neural_network.scalings_are_fixed = False
-    neural_network.normalizes_weights = True
+    neural_network.normalizes_activations = True
 
     if n_in_dims <= 0:
         raise (
@@ -1470,7 +1276,7 @@ cdef void init_Rbfn(
             neural_network.transform[i][j] = np_transform[i, j]
 
 @cython.warn.undeclared(True)
-cpdef DoubleArray rbfn_pre_norm_weights_eval(Rbfn self, DoubleArray input):
+cpdef DoubleArray rbfn_pre_norm_activations_eval(Rbfn self, DoubleArray input):
     cdef DoubleArray eval
     cdef Py_ssize_t self_n_in_dims
     cdef Py_ssize_t input_size
@@ -1521,16 +1327,30 @@ cpdef DoubleArray normalization_for_DoubleArray(DoubleArray arr):
     arr_sum = 0.
     for i in range(len(arr)):
         arr_sum += arr.view[i]
-    for i in range(len(arr)):
-        normalized_arr.view[i] = arr.view[i] / arr_sum
+
+    if arr_sum == 0.:
+        normalized_arr.view[i] = 1. / <double>len(arr)
+
+    else:
+        for i in range(len(arr)):
+            normalized_arr.view[i] = arr.view[i] / arr_sum
 
     return normalized_arr
 
-def unpickle_Rbfn(shape, parameters, scalings_are_fixed, normalizes_weights):
+cdef inline void assign_valarray_to_double(
+        valarray[double] arr,
+        double val
+        ) except *:
+    cdef size_t id
+
+    for id in range(arr.size()):
+        arr[id] = val
+
+def unpickle_Rbfn(shape, parameters, scalings_are_fixed, normalizes_activations):
     neural_network = Rbfn(shape[0], shape[1], shape[2])
     neural_network.scalings_are_fixed = False
     neural_network.set_parameters(parameters)
     neural_network.scalings_are_fixed = scalings_are_fixed
-    neural_network.normalizes_weights = normalizes_weights
+    neural_network.normalizes_activations = normalizes_activations
 
     return neural_network

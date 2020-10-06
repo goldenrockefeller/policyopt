@@ -30,64 +30,71 @@ cdef void init_DifferentiableFunctionApproximator(
     DifferentiableFunctionApproximator approximator,
     BaseDifferentiableMap super_map
     ) except *
-
-cdef class RobustFunctionApproximator(DifferentiableFunctionApproximator):
-    cdef double __line_search_change_rate
-    cdef double __line_search_step_size
-    # "nes" means Natural Evolutionary Strategy
-    # "nes" factors should be positive
-    cdef double __nes_size_growth_rate
-    cdef double __nes_direction_growth_rate
-    cdef double __nes_size_shrink_rate
-    cdef double __nes_direction_shrink_rate
-    cdef DoubleArray __nes_factors
-
-    cpdef double line_search_change_rate(self) except *
-    cpdef void set_line_search_change_rate(
-        self,
-        double line_search_change_rate
-        ) except *
-
-    cpdef double line_search_step_size(self) except *
-    cpdef void set_line_search_step_size(
-        self,
-        double line_search_step_size
-        ) except *
-
-    cpdef double nes_size_growth_rate(self) except *
-    cpdef void set_nes_size_growth_rate(
-        self,
-        double nes_size_growth_rate
-        ) except *
-
-    cpdef double nes_direction_growth_rate(self) except *
-    cpdef void set_nes_direction_growth_rate(
-        self,
-        double nes_direction_growth_rate
-        ) except *
-
-    cpdef double nes_size_shrink_rate(self) except *
-    cpdef void set_nes_size_shrink_rate(
-        self,
-        double nes_size_shrink_rate
-        ) except *
-
-    cpdef double nes_direction_shrink_rate(self) except *
-    cpdef void set_nes_direction_shrink_rate(
-        self,
-        double nes_direction_shrink_rate
-        ) except *
-
-    cpdef double nes_factor(self, Py_ssize_t id) except *
-    cpdef DoubleArray nes_factors(self)
-
-    cpdef void set_nes_factor(self, Py_ssize_t id, double val) except *
-    cpdef void set_nes_factors(self, DoubleArray factors) except *
-
-cdef RobustFunctionApproximator new_RobustFunctionApproximator(
-    BaseDifferentiableMap super_map)
-
-cdef void init_RobustFunctionApproximator(
-    RobustFunctionApproximator approximator,
-    BaseDifferentiableMap super_map
-    ) except *
+#
+# cdef class RobustFunctionApproximator(DifferentiableFunctionApproximator):
+#     cdef double __line_search_shrink_rate
+#     cdef double __line_search_growth_rate
+#     cdef double __line_search_step_size
+#     # "nes" means Natural Evolutionary Strategy
+#     # "nes" factors should be positive
+#     cdef double __nes_size_growth_rate
+#     cdef double __nes_direction_growth_rate
+#     cdef double __nes_size_shrink_rate
+#     cdef double __nes_direction_shrink_rate
+#     cdef DoubleArray __nes_factors
+#
+#     cpdef double line_search_shrink_rate(self) except *
+#     cpdef void set_line_search_shrink_rate(
+#         self,
+#         double line_search_shrink_rate
+#         ) except *
+#
+#     cpdef double line_search_growth_rate(self) except *
+#     cpdef void set_line_search_growth_rate(
+#         self,
+#         double line_search_growth_rate
+#         ) except *
+#
+#     cpdef double line_search_step_size(self) except *
+#     cpdef void set_line_search_step_size(
+#         self,
+#         double line_search_step_size
+#         ) except *
+#
+#     cpdef double nes_size_growth_rate(self) except *
+#     cpdef void set_nes_size_growth_rate(
+#         self,
+#         double nes_size_growth_rate
+#         ) except *
+#
+#     cpdef double nes_direction_growth_rate(self) except *
+#     cpdef void set_nes_direction_growth_rate(
+#         self,
+#         double nes_direction_growth_rate
+#         ) except *
+#
+#     cpdef double nes_size_shrink_rate(self) except *
+#     cpdef void set_nes_size_shrink_rate(
+#         self,
+#         double nes_size_shrink_rate
+#         ) except *
+#
+#     cpdef double nes_direction_shrink_rate(self) except *
+#     cpdef void set_nes_direction_shrink_rate(
+#         self,
+#         double nes_direction_shrink_rate
+#         ) except *
+#
+#     cpdef double nes_factor(self, Py_ssize_t id) except *
+#     cpdef DoubleArray nes_factors(self)
+#
+#     cpdef void set_nes_factor(self, Py_ssize_t id, double val) except *
+#     cpdef void set_nes_factors(self, DoubleArray factors) except *
+#
+# cdef RobustFunctionApproximator new_RobustFunctionApproximator(
+#     BaseDifferentiableMap super_map)
+#
+# cdef void init_RobustFunctionApproximator(
+#     RobustFunctionApproximator approximator,
+#     BaseDifferentiableMap super_map
+#     ) except *

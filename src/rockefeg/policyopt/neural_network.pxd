@@ -11,7 +11,6 @@ cdef extern from "<valarray>" namespace "std" nogil:
         size_t size() const
         valarray operator-() const
         valarray operator= (const valarray&)
-        valarray operator= (const T&)
         T& operator[] (size_t)
         T sum() const
 
@@ -27,28 +26,17 @@ cdef extern from "<valarray>" namespace "std" nogil:
         valarray operator- (const valarray&, const valarray&)
         valarray operator- (const T&, const valarray&)
         valarray operator- (const valarray&, const T&)
-    valarray[T] tanh[T] (const valarray[T]&)
 
-cdef class ReluTanh(BaseDifferentiableMap):
-    cdef vector[valarray[double]] linear0
-    cdef valarray[double] bias0
-    cdef vector[valarray[double]] linear1
-    cdef valarray[double] bias1
-
-    cpdef tuple shape(self)
+cdef class TanhLayer(BaseDifferentiableMap):
+    cdef public BaseDifferentiableMap super_map
 
     cpdef Py_ssize_t n_parameters(self) except *
 
-cdef ReluTanh new_ReluTanh(
-    Py_ssize_t n_in_dims,
-    Py_ssize_t n_hidden_neurons,
-    Py_ssize_t n_out_dims)
+cdef TanhLayer new_TanhLayer(BaseDifferentiableMap super_map)
 
-cdef void init_ReluTanh(
-    ReluTanh neural_network,
-    Py_ssize_t n_in_dims,
-    Py_ssize_t n_hidden_neurons,
-    Py_ssize_t n_out_dims
+cdef void init_TanhLayer(
+    TanhLayer neural_network,
+    BaseDifferentiableMap super_map
     ) except *
 
 
@@ -81,17 +69,17 @@ cdef void init_ReluLinear(
 
 
 cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
-    cdef vector[valarray[double]] centers
-    cdef vector[valarray[double]] scalings
-    cdef vector[valarray[double]] transform
+    cdef vector[valarray[double]] centers #[n_centers][n_in_dim]
+    cdef vector[valarray[double]] scalings #[n_centers][n_in_dim]
+    cdef vector[valarray[double]] transform #[n_out_dim][n_center]
     cdef public bint scalings_are_fixed
-    cdef public bint normalizes_weights
+    cdef public bint normalizes_activations
 
     cpdef tuple shape(self)
 
     cpdef Py_ssize_t n_parameters(self) except *
 
-    cpdef weights_eval(self, input)
+    cpdef activations_eval(self, input)
 
 cdef Rbfn new_Rbfn(
     Py_ssize_t n_in_dims,
@@ -105,5 +93,7 @@ cdef void init_Rbfn(
     Py_ssize_t n_out_dims
     ) except *
 
-cpdef rbfn_pre_norm_weights_eval(Rbfn self, DoubleArray input)
+cpdef DoubleArray rbfn_pre_norm_activations_eval(Rbfn self, DoubleArray input)
+
+cpdef DoubleArray normalization_for_DoubleArray(DoubleArray arr)
 
