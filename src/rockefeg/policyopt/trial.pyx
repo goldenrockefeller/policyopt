@@ -182,7 +182,8 @@ cdef class Trial:
         # start = perf_counter()
         
         if self.saves:
-            self.save()
+            pass # Need to check that time difference is significant
+            #self.save()
         time(&last_save_time)
         
         while not system.is_done_training():

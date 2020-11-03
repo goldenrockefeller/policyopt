@@ -161,6 +161,7 @@ cdef class FitnessCriticSystem(BaseSystem):
         cdef BaseFunctionApproximator intermediate_critic
         cdef TypedList current_trajectory
         cdef BaseSystem system
+        cdef DoubleArray intermediate_eval
 
         system = self.super_system()
 
@@ -175,7 +176,9 @@ cdef class FitnessCriticSystem(BaseSystem):
         current_trajectory = self.current_trajectory()
         current_trajectory.append(experience)
 
-        new_feedback = intermediate_critic.eval(experience).view[0]
+        intermediate_eval = intermediate_critic.eval(experience)
+        new_feedback = intermediate_eval.view[0]
+
 
         if not isfinite(new_feedback):
             raise RuntimeError("Something went wrong: feedback is not finite.")
