@@ -7,6 +7,7 @@ from .experience cimport ExperienceDatum, new_ExperienceDatum
 from .function_approximation cimport TargetEntry
 from rockefeg.cyutil.typed_list cimport TypedList, new_TypedList
 from rockefeg.cyutil.typed_list cimport is_sub_full_type
+from rockefeg.cyutil.array cimport DoubleArray
 
 from libc.math cimport isfinite
 
