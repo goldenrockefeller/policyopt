@@ -95,10 +95,10 @@ def unpickle_TanhLayer(super_map):
 cdef class ReluLinear(BaseDifferentiableMap):
     def __init__(
             self,
-            n_in_dims,
-            n_hidden_neurons,
-            n_out_dims,
-            linear1_is_fixed = False):
+            Py_ssize_t n_in_dims,
+            Py_ssize_t n_hidden_neurons,
+            Py_ssize_t n_out_dims,
+            bint linear1_is_fixed = False):
         init_ReluLinear(
             self,
             n_in_dims,
@@ -686,9 +686,9 @@ def unpickle_ReluLinear(shape, parameters, leaky_scale, linear1_is_fixed):
 cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
     def __init__(
             self,
-            n_in_dims,
-            n_centers,
-            n_out_dims):
+            Py_ssize_t n_in_dims,
+            Py_ssize_t n_centers,
+            Py_ssize_t n_out_dims):
         init_Rbfn(
             self,
             n_in_dims,
