@@ -85,7 +85,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
     cpdef TdHeavyTargetSetter copy(self, copy_obj = ?)
 
     cpdef double covariance_factor(self)  except *
-    cpdef void set_covariance_factor(self, covariance_factor) except *
+    cpdef void set_covariance_factor(self, double covariance_factor) except *
 
     cpdef bint normalizes_trace_variance(self)  except *
     cpdef void set_normalizes_trace_variance(
