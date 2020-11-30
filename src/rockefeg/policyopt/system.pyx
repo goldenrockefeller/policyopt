@@ -2,7 +2,7 @@ cimport cython
 
 @cython.warn.undeclared(True)
 cdef class BaseSystem:
-    cpdef copy(self, copy_obj = None):
+    cpdef BaseSystem copy(self, copy_obj = None):
         pass
 
     cpdef bint is_done_training(self) except *:
@@ -24,7 +24,7 @@ cdef class BaseSystem:
     cpdef void update_policy(self) except *:
         raise NotImplementedError("Abstract method.")
 
-    cpdef void receive_score(self, score) except *:
+    cpdef void receive_score(self, double score) except *:
         raise NotImplementedError("Abstract method.")
 
     cpdef void output_final_log(self, log_dirname, datetime_str) except *:

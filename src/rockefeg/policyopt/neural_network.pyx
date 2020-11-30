@@ -16,7 +16,7 @@ cdef class TanhLayer(BaseDifferentiableMap):
     def __reduce__(self):
         return unpickle_TanhLayer, (self.super_map)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef TanhLayer copy(self, copy_obj = None):
         cdef TanhLayer new_neural_network
 
         if copy_obj is None:
@@ -30,28 +30,16 @@ cdef class TanhLayer(BaseDifferentiableMap):
 
 
     cpdef Py_ssize_t n_parameters(self) except *:
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map
-
-        return super_map.n_parameters()
+        return self.super_map.n_parameters()
 
 
-    cpdef parameters(self):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map
-
-        return super_map.parameters()
+    cpdef DoubleArray parameters(self):
+        return self.super_map.parameters()
 
     cpdef void set_parameters(self, parameters) except *:
-        cdef BaseDifferentiableMap super_map
+        self.super_map.set_parameters(parameters)
 
-        super_map = self.super_map
-
-        super_map.set_parameters(parameters)
-
-    cpdef eval(self, input):
+    cpdef DoubleArray eval(self, input):
         cdef BaseDifferentiableMap super_map
         cdef DoubleArray eval
         cdef Py_ssize_t eval_id
@@ -64,17 +52,17 @@ cdef class TanhLayer(BaseDifferentiableMap):
 
         return eval
 
-    cpdef jacobian_wrt_parameters(self, input):
+    cpdef list jacobian_wrt_parameters(self, input):
         return default_jacobian_wrt_parameters(self, input)
 
-    cpdef jacobian_wrt_input(self, input):
+    cpdef list jacobian_wrt_input(self, input):
         return default_jacobian_wrt_input(self, input)
 
-    cpdef grad_wrt_parameters(self, input, output_grad = None):
+    cpdef DoubleArray grad_wrt_parameters(self, input, output_grad = None):
         # TODO
         raise NotImplementedError("Not implmented yet")
 
-    cpdef grad_wrt_input(self, input, output_grad = None):
+    cpdef DoubleArray grad_wrt_input(self, input, output_grad = None):
         # TODO
         raise NotImplementedError("Not implmented yet")
 
@@ -136,7 +124,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
             self.linear1_is_fixed
             ) )
 
-    cpdef copy(self, copy_obj = None):
+    cpdef ReluLinear copy(self, copy_obj = None):
         cdef ReluLinear new_neural_network
 
         if copy_obj is None:
@@ -173,7 +161,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
         return n_parameters
 
 
-    cpdef parameters(self):
+    cpdef DoubleArray parameters(self):
         cdef DoubleArray parameters
         cdef Py_ssize_t parameter_id
         cdef size_t i
@@ -244,7 +232,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
             self.bias1[i] = cy_parameters.view[parameter_id]
             parameter_id += 1
 
-    cpdef eval(self, input):
+    cpdef DoubleArray eval(self, input):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray eval
         cdef Py_ssize_t self_n_in_dims
@@ -298,13 +286,13 @@ cdef class ReluLinear(BaseDifferentiableMap):
 
         return eval
 
-    cpdef jacobian_wrt_parameters(self, input):
+    cpdef list jacobian_wrt_parameters(self, input):
         return default_jacobian_wrt_parameters(self, input)
 
-    cpdef jacobian_wrt_input(self, input):
+    cpdef list jacobian_wrt_input(self, input):
         return default_jacobian_wrt_input(self, input)
 
-    cpdef grad_wrt_parameters(self, input, output_grad = None):
+    cpdef DoubleArray grad_wrt_parameters(self, input, output_grad = None):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray cy_output_grad
         cdef DoubleArray grad_wrt_parameters
@@ -467,7 +455,7 @@ cdef class ReluLinear(BaseDifferentiableMap):
         return grad_wrt_parameters
 
 
-    cpdef grad_wrt_input(self, input, output_grad = None):
+    cpdef DoubleArray grad_wrt_input(self, input, output_grad = None):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray cy_output_grad
         cdef DoubleArray grad_wrt_input
@@ -726,7 +714,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
             ) )
 
 
-    cpdef copy(self, copy_obj = None):
+    cpdef Rbfn copy(self, copy_obj = None):
         cdef Rbfn new_neural_network
 
         if copy_obj is None:
@@ -766,7 +754,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
             * self.transform[0].size())
         return n_parameters
 
-    cpdef parameters(self):
+    cpdef DoubleArray parameters(self):
         cdef DoubleArray parameters
         cdef Py_ssize_t parameter_id
         cdef size_t i
@@ -832,7 +820,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
                 self.transform[i][j] = cy_parameters.view[parameter_id]
                 parameter_id += 1
 
-    cpdef activations_eval(self, input):
+    cpdef DoubleArray activations_eval(self, input):
         cdef DoubleArray eval
         cdef double eval_sum
 
@@ -843,7 +831,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
         return eval
 
-    cpdef eval(self, input):
+    cpdef DoubleArray eval(self, input):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray eval
         cdef DoubleArray activations
@@ -887,13 +875,13 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
         return eval
 
-    cpdef jacobian_wrt_parameters(self, input):
+    cpdef list jacobian_wrt_parameters(self, input):
         return default_jacobian_wrt_parameters(self, input)
 
-    cpdef jacobian_wrt_input(self, input):
+    cpdef list jacobian_wrt_input(self, input):
         return default_jacobian_wrt_input(self, input)
 
-    cpdef grad_wrt_parameters(self, input, output_grad = None):
+    cpdef DoubleArray grad_wrt_parameters(self, input, output_grad = None):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray cy_output_grad
         cdef DoubleArray grad_wrt_parameters
@@ -1061,7 +1049,7 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
 
         return grad_wrt_parameters
 
-    cpdef grad_wrt_input(self, input, output_grad = None):
+    cpdef DoubleArray grad_wrt_input(self, input, output_grad = None):
         cdef DoubleArray cy_input = <DoubleArray?> input
         cdef DoubleArray cy_output_grad
         cdef DoubleArray grad_wrt_input

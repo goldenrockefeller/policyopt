@@ -7,8 +7,8 @@ from .experience cimport ExperienceDatum
 @cython.auto_pickle(True)
 cdef class BaseMap:
 
-    cpdef copy(self, copy_obj = None):
-        pass
+    cpdef BaseMap copy(self, copy_obj = None):
+        raise NotImplementedError("Abstract method.")
 
     cpdef parameters(self):
         raise NotImplementedError("Abstract method.")
@@ -27,16 +27,25 @@ cdef class BaseMap:
 @cython.auto_pickle(True)
 cdef class BaseDifferentiableMap(BaseMap):
 
-    cpdef jacobian_wrt_parameters(self, input):
+    cpdef BaseDifferentiableMap copy(self, copy_obj = None):
         raise NotImplementedError("Abstract method.")
 
-    cpdef jacobian_wrt_input(self, input):
+    cpdef DoubleArray parameters(self):
         raise NotImplementedError("Abstract method.")
 
-    cpdef grad_wrt_parameters(self, input, output_grad = None):
+    cpdef DoubleArray eval(self, input):
         raise NotImplementedError("Abstract method.")
 
-    cpdef grad_wrt_input(self, input, output_grad = None):
+    cpdef list jacobian_wrt_parameters(self, input):
+        raise NotImplementedError("Abstract method.")
+
+    cpdef list jacobian_wrt_input(self, input):
+        raise NotImplementedError("Abstract method.")
+
+    cpdef DoubleArray grad_wrt_parameters(self, input, output_grad = None):
+        raise NotImplementedError("Abstract method.")
+
+    cpdef DoubleArray grad_wrt_input(self, input, output_grad = None):
         raise NotImplementedError("Abstract method.")
 
 cpdef list default_jacobian_wrt_parameters(
@@ -93,9 +102,8 @@ cdef class ContinuousCriticMap(BaseMap):
     def __init__(self, BaseMap super_map):
         init_ContinuousCriticMap(self, super_map)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef ContinuousCriticMap copy(self, copy_obj = None):
         cdef ContinuousCriticMap new_map
-        cdef BaseMap super_map
 
         if copy_obj is None:
             new_map = ContinuousCriticMap.__new__(ContinuousCriticMap)
@@ -104,45 +112,28 @@ cdef class ContinuousCriticMap(BaseMap):
 
         BaseMap.copy(self, new_map)
 
-        super_map = self.__super_map
-        new_map.__super_map = super_map.copy()
+        new_map.__super_map = self.__super_map.copy()
 
         return new_map
 
     cpdef parameters(self):
-        cdef BaseMap super_map
-
-        super_map = self.super_map()
-
-        return super_map.parameters()
+        return self.super_map().parameters()
 
     cpdef void set_parameters(self, parameters) except *:
-        cdef BaseMap super_map
-
-        super_map = self.super_map()
-
-        super_map.set_parameters(parameters)
+        self.super_map().set_parameters(parameters)
 
     cpdef Py_ssize_t n_parameters(self) except *:
-        cdef BaseMap super_map
-
-        super_map = self.super_map()
-
-        return super_map.n_parameters()
+        return self.super_map().n_parameters()
 
 
     cpdef eval(self, input):
-        cdef BaseMap super_map
+        return self.super_map().eval(concatenate_observation_action(input) )
 
-        super_map = self.super_map()
-
-        return super_map.eval(concatenate_state_action(input) )
-
-    cpdef super_map(self):
+    cpdef BaseMap super_map(self):
         return self.__super_map
 
-    cpdef void set_super_map(self, super_map) except *:
-        self.__super_map = <BaseMap?>super_map
+    cpdef void set_super_map(self, BaseMap super_map) except *:
+        self.__super_map = super_map
 
 @cython.warn.undeclared(True)
 cdef ContinuousCriticMap new_ContinuousCriticMap(BaseMap super_map):
@@ -172,9 +163,8 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
     def __init__(self, BaseDifferentiableMap super_map):
         init_DifferentiableCriticMap(self, super_map)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef DifferentiableCriticMap copy(self, copy_obj = None):
         cdef DifferentiableCriticMap new_map
-        cdef BaseDifferentiableMap super_map
 
         if copy_obj is None:
             new_map = DifferentiableCriticMap.__new__(DifferentiableCriticMap)
@@ -183,80 +173,47 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
         BaseDifferentiableMap.copy(self, new_map)
 
-        super_map = self.__super_map
-        new_map.__super_map = super_map.copy()
+        new_map.__super_map = self.__super_map.copy()
 
         return new_map
 
     cpdef parameters(self):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
-        return super_map.parameters()
+        return self.super_map().parameters()
 
     cpdef void set_parameters(self, parameters) except *:
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
-        super_map.set_parameters(parameters)
+        self.super_map().set_parameters(parameters)
 
     cpdef Py_ssize_t n_parameters(self) except *:
-        cdef BaseDifferentiableMap super_map
+        return self.super_map().n_parameters()
 
-        super_map = self.super_map()
+    cpdef DoubleArray eval(self, input):
+        return self.super_map().eval(concatenate_observation_action(input) )
 
-        return super_map.n_parameters()
-
-    cpdef eval(self, input):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
-        return super_map.eval(concatenate_state_action(input) )
-
-    cpdef jacobian_wrt_parameters(self, input):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
+    cpdef list jacobian_wrt_parameters(self, input):
         return (
-            super_map.jacobian_wrt_parameters(
-                concatenate_state_action(input) ))
+            self.super_map().jacobian_wrt_parameters(
+                concatenate_observation_action(input) ))
 
-    cpdef jacobian_wrt_input(self, input):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
+    cpdef list jacobian_wrt_input(self, input):
         return (
-            super_map.jacobian_wrt_input(
-                concatenate_state_action(input) ))
+            self.super_map().jacobian_wrt_input(
+                concatenate_observation_action(input) ))
 
-    cpdef grad_wrt_parameters(self, input, output_grad = None):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
+    cpdef DoubleArray grad_wrt_parameters(self, input, output_grad = None):
         return (
-            super_map.grad_wrt_parameters(
-                concatenate_state_action(input), output_grad))
+            self.super_map().grad_wrt_parameters(
+                concatenate_observation_action(input), output_grad))
 
-    cpdef grad_wrt_input(self, input, output_grad = None):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
+    cpdef DoubleArray grad_wrt_input(self, input, output_grad = None):
         return (
-            super_map.grad_wrt_input(
-                concatenate_state_action(input), output_grad))
+            self.super_map().grad_wrt_input(
+                concatenate_observation_action(input), output_grad))
 
-    cpdef super_map(self):
+    cpdef BaseDifferentiableMap super_map(self):
         return self.__super_map
 
-    cpdef void set_super_map(self, super_map) except *:
-        self.__super_map = <BaseDifferentiableMap?>super_map
+    cpdef void set_super_map(self, BaseDifferentiableMap super_map) except *:
+        self.__super_map = super_map
 
 @cython.warn.undeclared(True)
 cdef DifferentiableCriticMap new_DifferentiableCriticMap(
@@ -282,33 +239,33 @@ cdef void init_DifferentiableCriticMap(
     map.__super_map = super_map
 
 
-cpdef DoubleArray concatenate_state_action(input):
+cpdef DoubleArray concatenate_observation_action(input):
     cdef ExperienceDatum cy_input
-    cdef DoubleArray state
+    cdef DoubleArray observation
     cdef DoubleArray action
-    cdef DoubleArray state_action
-    cdef Py_ssize_t n_state_dims
+    cdef DoubleArray observation_action
+    cdef Py_ssize_t n_observation_dims
     cdef Py_ssize_t n_action_dims
     cdef Py_ssize_t id
 
     if isinstance(input, DoubleArray):
         return input
 
-    cy_input = <ExperienceDatum?> input
+    cy_input = input
 
 
-    state = <DoubleArray?>cy_input.state
-    action = <DoubleArray?>cy_input.action
+    observation = cy_input.observation
+    action = cy_input.action
 
-    n_state_dims = len(state)
+    n_observation_dims = len(observation)
     n_action_dims = len(action)
-    state_action = new_DoubleArray(n_state_dims + n_action_dims)
+    observation_action = new_DoubleArray(n_observation_dims + n_action_dims)
 
-    for id in range(n_state_dims):
-        state_action.view[id] = state.view[id]
+    for id in range(n_observation_dims):
+        observation_action.view[id] = observation.view[id]
 
     for id in range(n_action_dims):
-        state_action.view[id + n_state_dims] = action.view[id]
+        observation_action.view[id + n_observation_dims] = action.view[id]
 
-    return state_action
+    return observation_action
 

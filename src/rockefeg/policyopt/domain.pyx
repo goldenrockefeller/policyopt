@@ -2,7 +2,7 @@ cimport cython
 
 @cython.warn.undeclared(True)
 cdef class BaseDomain:
-    cpdef copy(self, copy_obj = None):
+    cpdef BaseDomain copy(self, copy_obj = None):
         pass
 
     cpdef void prep_for_epoch(self) except *:

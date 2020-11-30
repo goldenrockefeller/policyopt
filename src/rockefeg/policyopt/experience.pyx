@@ -4,7 +4,7 @@ cimport cython
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class ExperienceDatum:
-    cpdef copy(self, copy_obj = None):
+    cpdef ExperienceDatum copy(self, copy_obj = None):
         cdef ExperienceDatum new_datum
 
         if copy_obj is None:
@@ -12,7 +12,7 @@ cdef class ExperienceDatum:
         else:
             new_datum = copy_obj
 
-        new_datum.state = self.state
+        new_datum.observation = self.observation
         new_datum.action = self.action
         new_datum.reward = self.reward
 

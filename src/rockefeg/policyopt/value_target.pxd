@@ -1,19 +1,20 @@
 
 from .map cimport BaseMap
 from rockefeg.cyutil.array cimport DoubleArray
+from rockefeg.cyutil.typed_list cimport TypedList, BaseReadableTypedList
 
 cpdef DoubleArray concatenation_of_DoubleArray(
     DoubleArray arr1,
     DoubleArray arr2)
 
 cdef class BaseValueTargetSetter:
-    cpdef copy(self, copy_obj = ?)
+    cpdef BaseValueTargetSetter copy(self, copy_obj = ?)
 
-    cpdef value_target_entries(self, path)
+    cpdef TypedList value_target_entries(self, BaseReadableTypedList path)
 
 
 cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
-    pass
+    cpdef TotalRewardTargetSetter copy(self, copy_obj = ?)
 
 cdef TotalRewardTargetSetter new_TotalRewardTargetSetter()
 cdef void init_TotalRewardTargetSetter(
@@ -23,18 +24,20 @@ cdef void init_TotalRewardTargetSetter(
 
 cdef class BaseTdTargetSetter(BaseValueTargetSetter):
     cdef double __discount_factor
-    cdef object __critic
+    cdef BaseMap __critic
     cdef Py_ssize_t __min_lookahead
     cdef bint __forces_only_min_lookahead
     cdef bint __uses_terminal_step
 
-    cpdef trace(self, Py_ssize_t trace_len)
+    cpdef BaseTdTargetSetter copy(self, copy_obj = ?)
+
+    cpdef DoubleArray trace(self, Py_ssize_t trace_len)
 
     cpdef double discount_factor(self) except *
     cpdef void set_discount_factor(self, double discount_factor) except *
 
-    cpdef critic(self)
-    cpdef void set_critic(self, critic) except *
+    cpdef BaseMap critic(self)
+    cpdef void set_critic(self, BaseMap critic) except *
 
     cpdef Py_ssize_t min_lookahead(self)  except *
     cpdef void set_min_lookahead(self, Py_ssize_t n_steps) except *
@@ -57,6 +60,8 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
 
     cdef bint __redistributes_trace_tail
 
+    cpdef TdLambdaTargetSetter copy(self, copy_obj = ?)
+
     cpdef double trace_decay(self) except *
     cpdef void set_trace_decay(self, double trace_decay) except *
 
@@ -76,6 +81,8 @@ cdef void init_TdLambdaTargetSetter(
 cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
     cdef double __covariance_factor
     cdef bint __normalizes_trace_variance
+
+    cpdef TdHeavyTargetSetter copy(self, copy_obj = ?)
 
     cpdef double covariance_factor(self)  except *
     cpdef void set_covariance_factor(self, covariance_factor) except *

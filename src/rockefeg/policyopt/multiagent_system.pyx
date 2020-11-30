@@ -10,9 +10,10 @@ cdef class MultiagentSystem(BaseSystem):
     def __init__(self):
         init_MultiagentSystem(self)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef MultiagentSystem copy(self, copy_obj = None):
         cdef MultiagentSystem new_system
-        cdef BaseSystem system
+        cdef BaseSystem agent_system
+        cdef list new_agent_systems_list
         cdef Py_ssize_t agent_id
 
         if copy_obj is None:
@@ -20,8 +21,13 @@ cdef class MultiagentSystem(BaseSystem):
         else:
             new_system = copy_obj
 
-        new_system.__agent_systems = (
-            self.agent_systems_deep_copy())
+
+        new_agent_systems_list  = [None] * len(self.__agent_systems)
+        for agent_id in range(len(self.__agent_systems)):
+            agent_system = self.__agent_systems.item(agent_id)
+            new_agent_systems_list[new_agent_systems_list] = agent_system.copy()
+        new_system.__agent_systems = new_TypedList(BaseSystem)
+        new_system.__agent_systems.set_items(new_agent_systems_list)
 
         return new_system
 
@@ -97,7 +103,7 @@ cdef class MultiagentSystem(BaseSystem):
         for system in self.agent_systems():
             system.update_policy()
 
-    cpdef void receive_score(self, score) except *:
+    cpdef void receive_score(self, double score) except *:
         cdef BaseSystem system
 
         for system in self.agent_systems():
@@ -109,15 +115,13 @@ cdef class MultiagentSystem(BaseSystem):
         for system in self.agent_systems():
             system.output_final_log(log_dirname, datetime_str)
 
-    cpdef agent_systems(self):
+    cpdef TypedList agent_systems(self):
         return self.__agent_systems
 
-    cpdef void set_agent_systems(self, agent_systems) except *:
-        cdef BaseReadableTypedList new_agent_systems = (
-            <BaseReadableTypedList?> agent_systems)
+    cpdef void set_agent_systems(self, TypedList agent_systems) except *:
         cdef object systems_item_type
 
-        systems_item_type = new_agent_systems.item_type()
+        systems_item_type = agent_systems.item_type()
 
         if not is_sub_full_type(systems_item_type, BaseSystem):
             raise (
@@ -127,7 +131,7 @@ cdef class MultiagentSystem(BaseSystem):
                     "must be a subtype of BaseSystem."
                     .format(**locals())))
 
-        self.__agent_systems = new_agent_systems
+        self.__agent_systems = agent_systems
 
 @cython.warn.undeclared(True)
 cdef MultiagentSystem new_MultiagentSystem():

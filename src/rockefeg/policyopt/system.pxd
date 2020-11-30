@@ -1,5 +1,5 @@
 cdef class BaseSystem:
-    cpdef copy(self, copy_obj = ?)
+    cpdef BaseSystem copy(self, copy_obj = ?)
 
     cpdef bint is_done_training(self) except *
 
@@ -14,7 +14,7 @@ cdef class BaseSystem:
 
     cpdef void update_policy(self) except *
 
-    cpdef void receive_score(self, score) except *
+    cpdef void receive_score(self, double score) except *
 
     cpdef void output_final_log(self, log_dirname, datetime_str) except *
     # string log_dirname

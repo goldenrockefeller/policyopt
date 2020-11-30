@@ -1,6 +1,6 @@
 cimport cython
 from rockefeg.cyutil.array cimport new_DoubleArray
-from rockefeg.cyutil.typed_list cimport BaseReadableTypedList, is_sub_full_type
+from rockefeg.cyutil.typed_list cimport is_sub_full_type
 # import numpy as np
 # from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 # from numpy.random cimport bitgen_t
@@ -24,7 +24,7 @@ from rockefeg.cyutil.typed_list cimport BaseReadableTypedList, is_sub_full_type
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class TargetEntry:
-    cpdef copy(self, copy_obj = None):
+    cpdef TargetEntry copy(self, copy_obj = None):
         cdef TargetEntry new_entry
 
         if copy_obj is None:
@@ -50,20 +50,21 @@ cdef TargetEntry new_TargetEntry():
 @cython.auto_pickle(True)
 cdef class BaseFunctionApproximator(BaseMap):
 
-    cpdef void batch_update(self, entries) except *:
+    cpdef BaseFunctionApproximator copy(self, copy_obj = None):
+        raise NotImplementedError("Abstract method.")
+
+    cpdef void batch_update(self, BaseReadableTypedList entries) except *:
         raise NotImplementedError("Abstract method.")
 
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
-    def __init__(self, super_map):
+    def __init__(self, BaseDifferentiableMap super_map):
         init_DifferentiableFunctionApproximator(self, super_map)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef DifferentiableFunctionApproximator copy(self, copy_obj = None):
         cdef DifferentiableFunctionApproximator new_approximator
-        cdef BaseDifferentiableMap super_map
-
         if copy_obj is None:
             new_approximator = (
                 DifferentiableFunctionApproximator.__new__(
@@ -71,42 +72,24 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         else:
             new_approximator = copy_obj
 
-        super_map = self.__super_map
-        new_approximator.__super_map = super_map.copy()
+        new_approximator.__super_map = self.__super_map.copy()
         new_approximator.__learning_rate = self.__learning_rate
 
         return new_approximator
 
     cpdef parameters(self):
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
-        return super_map.parameters()
+        return self.super_map().parameters()
 
     cpdef void set_parameters(self, parameters) except *:
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
-        super_map.set_parameters(parameters)
+        self.super_map().set_parameters(parameters)
 
     cpdef Py_ssize_t n_parameters(self) except *:
-        cdef BaseDifferentiableMap super_map
-
-        super_map = self.super_map()
-
-        return super_map.n_parameters()
+        return self.super_map().n_parameters()
 
     cpdef eval(self, input):
-        cdef BaseDifferentiableMap super_map
+        return self.super_map().eval(input)
 
-        super_map = self.super_map()
-
-        return super_map.eval(input)
-
-    cpdef void batch_update(self, entries) except *:
-        cdef BaseReadableTypedList entries_cy = <BaseReadableTypedList?> entries
+    cpdef void batch_update(self, BaseReadableTypedList entries) except *:
         cdef object input
         cdef DoubleArray parameters
         cdef DoubleArray error
@@ -122,7 +105,7 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         cdef object entries_item_type
         cdef double learning_rate
 
-        entries_item_type = entries_cy.item_type()
+        entries_item_type = entries.item_type()
 
         if not is_sub_full_type(entries_item_type, TargetEntry):
             raise (
@@ -138,11 +121,11 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         n_parameters = map.n_parameters()
         sum_error_grad_wrt_parameters = new_DoubleArray(n_parameters)
         sum_error_grad_wrt_parameters.set_all_to(0.)
-        n_entries = len(entries_cy)
+        n_entries = len(entries)
         learning_rate = self.learning_rate()
 
 
-        for entry in entries_cy:
+        for entry in entries:
 
             error = error_eval(map, entry)
 
@@ -177,11 +160,11 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         # Update the maps parameters.
         map.set_parameters(parameters)
 
-    cpdef super_map(self):
+    cpdef BaseDifferentiableMap super_map(self):
         return self.__super_map
 
-    cpdef set_super_map(self, map):
-        self.__super_map = <BaseDifferentiableMap?> map
+    cpdef void set_super_map(self, BaseDifferentiableMap map) except *:
+        self.__super_map = map
 
     cpdef double learning_rate(self) except *:
         return self.__learning_rate
@@ -263,7 +246,7 @@ cdef void init_DifferentiableFunctionApproximator(
 #         return new_approximator
 #
 #     cpdef void batch_update(self, entries) except *:
-#         cdef BaseReadableTypedList entries_cy = <BaseReadableTypedList?> entries
+#         cdef BaseReadableTypedList entries = <BaseReadableTypedList?> entries
 #         cdef object input
 #         cdef DoubleArray nes_factors
 #         cdef DoubleArray parameters
@@ -304,7 +287,7 @@ cdef void init_DifferentiableFunctionApproximator(
 #
 #         # "nes" means Natural Evolutionary Strategy
 #
-#         entries_item_type = entries_cy.item_type()
+#         entries_item_type = entries.item_type()
 #
 #         if not is_sub_full_type(entries_item_type, TargetEntry):
 #             raise (
@@ -318,7 +301,7 @@ cdef void init_DifferentiableFunctionApproximator(
 #         parameters = map.parameters()
 #         parameters = parameters.copy()
 #         n_parameters = map.n_parameters()
-#         n_entries = len(entries_cy)
+#         n_entries = len(entries)
 #         learning_rate = self.learning_rate()
 #         nes_factors = self.nes_factors()
 #         line_search_shrink_rate = self.line_search_shrink_rate()
@@ -331,7 +314,7 @@ cdef void init_DifferentiableFunctionApproximator(
 #         nes_direction_shrink_rate = self.nes_direction_shrink_rate()
 #
 #
-#         for entry in entries_cy:
+#         for entry in entries:
 #
 #             input = entry.input
 #             output = map.eval(input)

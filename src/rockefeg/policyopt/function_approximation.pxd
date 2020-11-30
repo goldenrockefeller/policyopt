@@ -1,24 +1,29 @@
 from .map cimport BaseMap, BaseDifferentiableMap
 from rockefeg.cyutil.array cimport DoubleArray
+from rockefeg.cyutil.typed_list cimport BaseReadableTypedList
 
 cdef class TargetEntry:
     cdef public object input
     cdef public object target
 
-    cpdef copy(self, copy_obj = ?)
+    cpdef TargetEntry copy(self, copy_obj = ?)
 
 cdef TargetEntry new_TargetEntry()
 
 cdef class BaseFunctionApproximator(BaseMap):
-    cpdef void batch_update(self, entries) except *
+    cpdef BaseFunctionApproximator copy(self, copy_obj = ?)
+
+    cpdef void batch_update(self, BaseReadableTypedList entries) except *
 
 
 cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
-    cdef object __super_map # BaseDifferentiableMap
+    cdef BaseDifferentiableMap __super_map
     cdef double __learning_rate
 
-    cpdef super_map(self)
-    cpdef set_super_map(self, map)
+    cpdef DifferentiableFunctionApproximator copy(self, copy_obj = ?)
+
+    cpdef BaseDifferentiableMap super_map(self)
+    cpdef void set_super_map(self, BaseDifferentiableMap map) except *
 
     cpdef double learning_rate(self) except *
     cpdef void set_learning_rate(self, double learning_rate) except *

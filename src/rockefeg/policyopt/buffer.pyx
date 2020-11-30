@@ -11,22 +11,18 @@ cdef class ShuffleBuffer:
     def __init__(self, item_type):
         init_ShuffleBuffer(self, item_type)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef ShuffleBuffer copy(self, copy_obj = None):
         cdef ShuffleBuffer new_buffer
         cdef list shuffled_data_list
-        cdef TypedList staged_data
-        cdef TypedList shuffled_data
 
         if copy_obj is None:
             new_buffer = ShuffleBuffer.__new__(ShuffleBuffer)
         else:
             new_buffer = copy_obj
 
-        staged_data = self.__staged_data
-        new_buffer.__staged_data = staged_data.shallow_copy()
+        new_buffer.__staged_data = self.__staged_data.shallow_copy()
 
-        shuffled_data = self.__shuffled_data
-        new_buffer.__shuffled_data = shuffled_data.shallow_copy()
+        new_buffer.__shuffled_data = self.__shuffled_data.shallow_copy()
 
         new_buffer.__capacity = self.__capacity
         new_buffer.__buffer_pos = self.__buffer_pos
@@ -34,9 +30,9 @@ cdef class ShuffleBuffer:
 
         # Reshuffle the new buffer to decorrelate with self buffer.
         # TODO: .shuffle  can be optimized
-        shuffled_data_list =  shuffled_data.items_shallow_copy()
+        shuffled_data_list =  self.__shuffled_data.items_shallow_copy()
         np.random.shuffle(shuffled_data_list)
-        shuffled_data.set_items(shuffled_data_list)
+        self.__shuffled_data.set_items(shuffled_data_list)
 
         return new_buffer
 
@@ -86,26 +82,14 @@ cdef class ShuffleBuffer:
 
 
     cpdef void clear(self) except *:
-        cdef TypedList shuffled_data
-        cdef TypedList staged_data
-
-        staged_data = self._staged_data()
-        shuffled_data = self._shuffled_data()
-
-        staged_data.set_items([])
-        shuffled_data.set_items([])
+        self._staged_data().set_items([])
+        self._shuffled_data().set_items([])
         self._set_buffer_pos(0)
 
     cpdef bint is_empty(self) except *:
-        cdef TypedList shuffled_data
-        cdef TypedList staged_data
-
-        staged_data = self._staged_data()
-        shuffled_data = self._shuffled_data()
-
         return (
-            (len(staged_data) == 0)
-            and (len(shuffled_data) == 0) )
+            (len(self.staged_data()) == 0)
+            and (len(self.shuffled_data()) == 0) )
 
     cpdef Py_ssize_t capacity(self) except *:
         return self.__capacity
@@ -168,17 +152,17 @@ cdef class ShuffleBuffer:
 
         self.__buffer_pos = buffer_pos
 
-    cpdef fixed_len_staged_data(self):
-        return new_FixedLenTypedList(self._staged_data())
+    cpdef BaseReadableTypedList staged_data(self):
+        return self.__staged_data
 
-    cpdef _staged_data(self):
+    cpdef TypedList _staged_data(self):
         return self.__staged_data
 
 
-    cpdef fixed_len_shuffled_data(self):
-        return new_FixedLenTypedList(self._shuffled_data())
+    cpdef BaseReadableTypedList shuffled_data(self):
+        return self.__shuffled_data
 
-    cpdef _shuffled_data(self):
+    cpdef TypedList _shuffled_data(self):
         return self.__shuffled_data
 
     cpdef item_type(self):

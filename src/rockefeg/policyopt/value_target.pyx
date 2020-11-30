@@ -29,14 +29,13 @@ cpdef DoubleArray concatenation_of_DoubleArray(
 
 
 @cython.warn.undeclared(True)
-cpdef DoubleArray rewards_from_path(path):
-    cdef BaseReadableTypedList path_cy = <BaseReadableTypedList?> path
+cpdef DoubleArray rewards_from_path(BaseReadableTypedList path):
     cdef ExperienceDatum experience
     cdef Py_ssize_t experience_id
     cdef DoubleArray rewards
     cdef object path_item_type
 
-    path_item_type = path_cy.item_type()
+    path_item_type = path.item_type()
 
     if not is_sub_full_type(path_item_type, ExperienceDatum):
         raise (
@@ -46,10 +45,10 @@ cpdef DoubleArray rewards_from_path(path):
                 "must be a subtype of ExperienceDatum."
                 .format(**locals())))
 
-    rewards = new_DoubleArray(len(path_cy))
+    rewards = new_DoubleArray(len(path))
 
-    for experience_id in range(len(path_cy)):
-        experience = path_cy.item(experience_id)
+    for experience_id in range(len(path)):
+        experience = path.item(experience_id)
         rewards.view[experience_id] = experience.reward
 
     return rewards
@@ -404,10 +403,10 @@ cpdef value_target_entries(
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class BaseValueTargetSetter:
-    cpdef copy(self, copy_obj = None):
+    cpdef BaseValueTargetSetter copy(self, copy_obj = None):
         pass
 
-    cpdef value_target_entries(self, path):
+    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
         raise NotImplementedError("Abstract method.")
 
 @cython.warn.undeclared(True)
@@ -416,7 +415,7 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
     def __init__(self):
         init_TotalRewardTargetSetter(self)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef TotalRewardTargetSetter copy(self, copy_obj = None):
         cdef TotalRewardTargetSetter new_target_setter
 
         if copy_obj is None:
@@ -428,8 +427,7 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
 
         return new_target_setter
 
-    cpdef value_target_entries(self, path):
-        cdef BaseReadableTypedList path_cy = <BaseReadableTypedList?> path
+    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
         cdef Py_ssize_t experience_id
         cdef list value_target_entries_list
         cdef BaseReadableTypedList value_target_entries_ret
@@ -438,7 +436,7 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
         cdef ExperienceDatum experience #
         cdef object path_item_type
 
-        path_item_type = path_cy.item_type()
+        path_item_type = path.item_type()
 
         if not is_sub_full_type(path_item_type, ExperienceDatum):
             raise (
@@ -450,10 +448,10 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
 
         # Add up all rewards from both paths
         total_reward = 0
-        for experience in path_cy:
+        for experience in path:
             total_reward += experience.reward
 
-        target_values = new_DoubleArray(len(path_cy))
+        target_values = new_DoubleArray(len(path))
         target_values.set_all_to(total_reward)
 
         value_target_entries_ret = (
@@ -491,7 +489,7 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
     def __init__(self):
         init_BaseTdTargetSetter(self)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef BaseTdTargetSetter copy(self, copy_obj = None):
         cdef BaseTdTargetSetter new_target_setter
 
         if copy_obj is None:
@@ -508,12 +506,11 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
 
         return new_target_setter
 
-    cpdef trace(self, Py_ssize_t trace_len):
+    cpdef DoubleArray trace(self, Py_ssize_t trace_len):
         raise NotImplementedError("Abstract method.")
 
 
-    cpdef value_target_entries(self, path):
-        cdef BaseReadableTypedList path_cy = <BaseReadableTypedList?> path
+    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
         cdef DoubleArray trace
         cdef DoubleArray q_values
         cdef DoubleArray rewards
@@ -528,7 +525,7 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
         cdef Py_ssize_t min_lookahead
         cdef object path_item_type
 
-        path_item_type = path_cy.item_type()
+        path_item_type = path.item_type()
 
         if not is_sub_full_type(path_item_type, ExperienceDatum):
             raise (
@@ -538,7 +535,7 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
                     "must be a subtype of ExperienceDatum."
                     .format(**locals())))
 
-        path_len = len(path_cy)
+        path_len = len(path)
         if self.uses_terminal_step():
             n_q_updates = path_len
         else:
@@ -563,7 +560,7 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
         #
         trace = self.trace(trace_len)
 
-        rewards = rewards_from_path(path_cy)
+        rewards = rewards_from_path(path)
 
         q_values = q_value_evals(path, self.critic())
 
@@ -600,11 +597,11 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
     cpdef void set_discount_factor(self, double discount_factor) except *:
         self.__discount_factor = discount_factor
 
-    cpdef critic(self):
+    cpdef BaseMap critic(self):
         return self.__critic
 
-    cpdef void set_critic(self, critic) except *:
-        self.__critic = <BaseMap?> critic
+    cpdef void set_critic(self, BaseMap critic) except *:
+        self.__critic = critic
 
     cpdef Py_ssize_t min_lookahead(self) except *:
         return self.__min_lookahead
@@ -655,7 +652,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
     def __init__(self, BaseMap critic):
         init_TdLambdaTargetSetter(self, critic)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef TdLambdaTargetSetter copy(self, copy_obj = None):
         cdef TdLambdaTargetSetter new_target_setter
 
         if copy_obj is None:
@@ -673,7 +670,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
 
         return new_target_setter
 
-    cpdef trace(self, Py_ssize_t trace_len):
+    cpdef DoubleArray trace(self, Py_ssize_t trace_len):
         cdef DoubleArray trace
         cdef double discount_factor
         cdef double decay_discount_rate
@@ -708,8 +705,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
 
     # TODO: backward view for TD eligibity traces (more efficient)
 
-    cpdef value_target_entries(self, path):
-        cdef BaseReadableTypedList path_cy = <BaseReadableTypedList?> path
+    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
         cdef DoubleArray trace
         cdef DoubleArray q_values
         cdef DoubleArray rewards
@@ -724,7 +720,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
         cdef Py_ssize_t min_lookahead
         cdef object path_item_type
 
-        path_item_type = path_cy.item_type()
+        path_item_type = path.item_type()
 
         if not is_sub_full_type(path_item_type, ExperienceDatum):
             raise (
@@ -735,11 +731,11 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
                     .format(**locals())))
 
         if not self.redistributes_trace_tail():
-            return BaseTdTargetSetter.value_target_entries(self, path_cy)
+            return BaseTdTargetSetter.value_target_entries(self, path)
 
         else:
             min_lookahead = self.min_lookahead()
-            path_len = len(path_cy)
+            path_len = len(path)
             if self.uses_terminal_step():
                 n_q_updates = path_len
             else:
@@ -763,7 +759,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
             #
             trace = self.trace(trace_len)
 
-            rewards = rewards_from_path(path_cy)
+            rewards = rewards_from_path(path)
 
             q_values = q_value_evals(path, self.critic())
 
@@ -846,7 +842,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
     def __init__(self, BaseMap critic):
         init_TdHeavyTargetSetter(self, critic)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef TdHeavyTargetSetter copy(self, copy_obj = None):
         cdef TdHeavyTargetSetter new_target_setter
 
         if copy_obj is None:
@@ -861,7 +857,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
 
         return new_target_setter
 
-    cpdef trace(self, Py_ssize_t trace_len):
+    cpdef DoubleArray trace(self, Py_ssize_t trace_len):
         cdef DoubleArray trace
         cdef DoubleArray stdev_factors
         cdef double stdev_factor
@@ -916,8 +912,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
 
         return trace
 
-    cpdef value_target_entries(self, path):
-        cdef BaseReadableTypedList path_cy = <BaseReadableTypedList?> path
+    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
         cdef DoubleArray trace
         cdef DoubleArray q_values
         cdef DoubleArray rewards
@@ -932,7 +927,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
         cdef Py_ssize_t min_lookahead
         cdef object path_item_type
 
-        path_item_type = path_cy.item_type()
+        path_item_type = path.item_type()
 
         if not is_sub_full_type(path_item_type, ExperienceDatum):
             raise (
@@ -943,11 +938,11 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
                     .format(**locals())))
 
         if not self.normalizes_trace_variance():
-            return BaseTdTargetSetter.value_target_entries(self, path_cy)
+            return BaseTdTargetSetter.value_target_entries(self, path)
 
         else:
             min_lookahead = self.min_lookahead()
-            path_len = len(path_cy)
+            path_len = len(path)
             if self.uses_terminal_step():
                 n_q_updates = path_len
             else:
@@ -971,7 +966,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
             #
             trace = self.trace(trace_len)
 
-            rewards = rewards_from_path(path_cy)
+            rewards = rewards_from_path(path)
 
             q_values = q_value_evals(path, self.critic())
 

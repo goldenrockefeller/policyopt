@@ -1,11 +1,13 @@
+from rockefeg.cyutil.typed_list cimport TypedList, BaseReadableTypedList
+
 cdef class ShuffleBuffer:
-    cdef __shuffled_data
-    cdef __staged_data
+    cdef TypedList __shuffled_data
+    cdef TypedList __staged_data
     cdef __item_type
     cdef Py_ssize_t __capacity
     cdef Py_ssize_t __buffer_pos
 
-    cpdef copy(self, copy_obj = ?)
+    cpdef ShuffleBuffer copy(self, copy_obj = ?)
 
     cpdef void add_staged_datum(self, datum) except *
 
@@ -22,18 +24,13 @@ cdef class ShuffleBuffer:
     cpdef Py_ssize_t _buffer_pos(self) except *
     cpdef void _set_buffer_pos(self, Py_ssize_t buffer_pos) except *
 
-    cpdef fixed_len_staged_data(self)
-    cpdef _staged_data(self)
+    cpdef BaseReadableTypedList staged_data(self)
+    cpdef TypedList _staged_data(self)
 
-    cpdef fixed_len_shuffled_data(self)
-    cpdef _shuffled_data(self)
+    cpdef BaseReadableTypedList shuffled_data(self)
+    cpdef TypedList _shuffled_data(self)
 
     cpdef item_type(self)
-
-
-
-
-
 
 
 cdef ShuffleBuffer new_ShuffleBuffer(item_type)

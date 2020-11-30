@@ -1,19 +1,18 @@
 cimport cython
 
 from rockefeg.cyutil.array cimport DoubleArray
-from rockefeg.cyutil.typed_list cimport TypedList, new_TypedList
-from rockefeg.cyutil.typed_list cimport new_FixedLenTypedList, FixedLenTypedList
-from rockefeg.cyutil.typed_list cimport is_sub_full_type, BaseWritableTypedList
+from rockefeg.cyutil.typed_list cimport new_TypedList
+from rockefeg.cyutil.typed_list cimport is_sub_full_type
 
 import random
 import numpy as np
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class BasePhenotype:
-    def __init__(self, policy):
+    def __init__(self, BaseMap policy):
         init_BasePhenotype(self, policy)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef BasePhenotype copy(self, copy_obj = None):
         cdef BasePhenotype new_phenotype
 
         if copy_obj is None:
@@ -21,11 +20,11 @@ cdef class BasePhenotype:
         else:
             new_phenotype = copy_obj
 
-        new_phenotype.__policy = (<BaseMap?>self.__policy).copy()
+        new_phenotype.__policy = self.__policy.copy()
 
         return new_phenotype
 
-    cpdef child(self, args = None):
+    cpdef BasePhenotype child(self, args = None):
         raise NotImplementedError("Abstract method.")
 
     cpdef void mutate(self, args = None) except *:
@@ -35,11 +34,7 @@ cdef class BasePhenotype:
         raise NotImplementedError("Abstract method.")
 
     cpdef action(self, observation):
-        cdef BaseMap policy
-
-        policy = self.policy()
-
-        return policy.eval(observation)
+        return self.policy().eval(observation)
 
     cpdef double fitness(self) except *:
         raise NotImplementedError("Abstract method.")
@@ -50,11 +45,11 @@ cdef class BasePhenotype:
     cpdef void prep_for_epoch(self) except *:
         raise NotImplementedError("Abstract method.")
 
-    cpdef policy(self):
+    cpdef BaseMap policy(self):
         return self.__policy
 
-    cpdef void set_policy(self, policy) except *:
-        self.__policy = <BaseMap?>policy
+    cpdef void set_policy(self, BaseMap policy) except *:
+        self.__policy = policy
 
 @cython.warn.undeclared(True)
 cdef void init_BasePhenotype(
@@ -72,10 +67,10 @@ cdef void init_BasePhenotype(
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
 cdef class DefaultPhenotype(BasePhenotype):
-    def __init__(self, policy):
-        init_DefaultPhenotype(self, policy)
+    def __init__(self, BaseMap policy):
+        init_DefaultPhenotype(self,  policy)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef DefaultPhenotype copy(self, copy_obj = None):
         cdef DefaultPhenotype new_phenotype
 
         if copy_obj is None:
@@ -90,7 +85,7 @@ cdef class DefaultPhenotype(BasePhenotype):
 
         return new_phenotype
 
-    cpdef child(self, args = None):
+    cpdef DefaultPhenotype child(self, args = None):
         cdef DefaultPhenotype child
 
         child = self.copy()
@@ -99,16 +94,13 @@ cdef class DefaultPhenotype(BasePhenotype):
         return child
 
     cpdef void mutate(self, args = None) except *:
-        cdef BaseMap policy
         cdef DoubleArray parameters
         cdef object mutation
         cdef Py_ssize_t param_id
         cdef double[:] mutation_view
 
         # TODO Optimize, getting mutation vector is done through python (numpy).
-        policy = <BaseMap?>self.policy()
-
-        parameters = <DoubleArray?> policy.parameters()
+        parameters =  self.policy().parameters()
 
         mutation = (
             self.mutation_factor()
@@ -117,15 +109,19 @@ cdef class DefaultPhenotype(BasePhenotype):
             np.random.uniform(0, 1, len(parameters))
             < self.mutation_rate())
 
+        # TODO avoid double view setting if possible
         mutation_view = mutation
 
         for param_id in range(len(parameters)):
             parameters.view[param_id] += mutation_view[param_id]
 
-        policy.set_parameters(parameters)
+        self.policy().set_parameters(parameters)
 
     cpdef void receive_feedback(self, feedback) except *:
-        self.set_fitness(self.fitness() + <double?>feedback)
+        cdef double feedback_as_double
+
+        feedback_as_double = feedback
+        self.set_fitness(self.fitness() + feedback_as_double)
 
     cpdef double fitness(self) except *:
         return self.__fitness
@@ -191,12 +187,12 @@ cdef class BaseEvolvingSystem(BaseSystem):
     def __init__(self):
         init_BaseEvolvingSystem(self)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef BaseEvolvingSystem copy(self, copy_obj = None):
         cdef BaseEvolvingSystem new_system
         cdef BasePhenotype phenotype
         cdef Py_ssize_t phenotype_id
-        cdef BaseWritableTypedList phenotypes
-        cdef BaseWritableTypedList new_phenotypes
+        cdef TypedList phenotypes
+        cdef TypedList new_phenotypes
         cdef TypedList unevaluated_phenotypes
         cdef TypedList new_unevaluated_phenotypes
 
@@ -235,7 +231,7 @@ cdef class BaseEvolvingSystem(BaseSystem):
         cdef BasePhenotype phenotype
         cdef Py_ssize_t n_phenotypes
         cdef TypedList unevaluated_phenotypes
-        cdef BaseWritableTypedList phenotypes
+        cdef TypedList phenotypes
 
         phenotypes = self.phenotypes()
         unevaluated_phenotypes = self._unevaluated_phenotypes()
@@ -263,21 +259,13 @@ cdef class BaseEvolvingSystem(BaseSystem):
         self._set_best_phenotype(self.acting_phenotype())
 
     cpdef bint is_ready_for_evaluation(self) except *:
-        return len(self._unevaluated_phenotypes()) == 0
+        return len(self.unevaluated_phenotypes()) == 0
 
     cpdef action(self, observation):
-        cdef BasePhenotype acting_phenotype
-
-        acting_phenotype = self.acting_phenotype()
-
-        return acting_phenotype.action(observation)
+        return self.acting_phenotype().action(observation)
 
     cpdef void receive_feedback(self, feedback) except *:
-        cdef BasePhenotype acting_phenotype
-
-        acting_phenotype = self.acting_phenotype()
-
-        acting_phenotype.receive_feedback(feedback)
+        self.acting_phenotype().receive_feedback(feedback)
 
     cpdef void update_policy(self) except *:
         cdef BasePhenotype acting_phenotype
@@ -312,21 +300,20 @@ cdef class BaseEvolvingSystem(BaseSystem):
     cpdef void operate(self) except *:
         raise NotImplementedError("Abstract method.")
 
-    cpdef void receive_score(self, score) except *:
+    cpdef void receive_score(self, double score) except *:
         pass
 
     cpdef void output_final_log(self, log_dirname, datetime_str) except *:
         pass
 
-    cpdef phenotypes(self):
+    cpdef TypedList phenotypes(self):
         return self.__phenotypes
 
-    cpdef void set_phenotypes(self, phenotypes) except *:
-        cdef BaseWritableTypedList setting_phenotypes = (
-            <BaseWritableTypedList?> phenotypes)
+    cpdef void set_phenotypes(self, TypedList phenotypes) except *:
+
         cdef object phenotypes_item_type
 
-        phenotypes_item_type = setting_phenotypes.item_type()
+        phenotypes_item_type = phenotypes.item_type()
 
         if not is_sub_full_type(phenotypes_item_type, BasePhenotype):
             raise (
@@ -336,13 +323,16 @@ cdef class BaseEvolvingSystem(BaseSystem):
                     "must be a subtype of BasePhenotype."
                     .format(**locals())))
 
-        self.__phenotypes = setting_phenotypes
+        self.__phenotypes = phenotypes
 
-    cpdef fixed_len_unevaluated_phenotypes(self, unevaluated_phenotypes):
-        return new_FixedLenTypedList(self._unevaluated_phenotypes())
-
-    cpdef _unevaluated_phenotypes(self):
+    cpdef BaseReadableTypedList unevaluated_phenotypes(self):
         return self.__unevaluated_phenotypes
+
+    cpdef TypedList _unevaluated_phenotypes(self):
+        return self.__unevaluated_phenotypes
+
+    cpdef void _set_unevaluated_phenotypes(self, TypedList phenotypes) except *:
+        self.__unevaluated_phenotypes = phenotypes
 
     cpdef Py_ssize_t max_n_epochs(self) except *:
         return self.__max_n_epochs
@@ -384,17 +374,17 @@ cdef class BaseEvolvingSystem(BaseSystem):
 
         self.__n_epochs_elapsed = n_epochs_elapsed
 
-    cpdef best_phenotype(self):
+    cpdef BasePhenotype best_phenotype(self):
         return self.__best_phenotype
 
-    cpdef void _set_best_phenotype(self, phenotype) except *:
-        self.__best_phenotype = <BasePhenotype?>phenotype
+    cpdef void _set_best_phenotype(self, BasePhenotype phenotype) except *:
+        self.__best_phenotype = phenotype
 
-    cpdef acting_phenotype(self):
+    cpdef BasePhenotype acting_phenotype(self):
         return  self.__acting_phenotype
 
-    cpdef void _set_acting_phenotype(self, phenotype) except *:
-        self.__acting_phenotype = <BasePhenotype?>phenotype
+    cpdef void _set_acting_phenotype(self, BasePhenotype phenotype) except *:
+        self.__acting_phenotype = phenotype
 
 @cython.warn.undeclared(True)
 cdef BaseEvolvingSystem new_BaseEvolvingSystem():
@@ -423,7 +413,7 @@ cdef class DefaultEvolvingSystem:
     def __init__(self):
         init_DefaultEvolvingSystem(self)
 
-    cpdef copy(self, copy_obj = None):
+    cpdef DefaultEvolvingSystem copy(self, copy_obj = None):
         cdef DefaultEvolvingSystem new_system
 
         if copy_obj is None:
@@ -441,7 +431,7 @@ cdef class DefaultEvolvingSystem:
         cdef DefaultPhenotype contender_b
         cdef double fitness_a
         cdef double fitness_b
-        cdef BaseWritableTypedList phenotypes_typed_list
+        cdef TypedList phenotypes_typed_list
         cdef list phenotypes
 
         phenotypes_typed_list = self.phenotypes()
@@ -463,12 +453,10 @@ cdef class DefaultEvolvingSystem:
 
         phenotypes_typed_list.set_items(phenotypes)
 
-    cpdef void set_phenotypes(self, phenotypes) except *:
-        cdef BaseWritableTypedList setting_phenotypes = (
-            <BaseWritableTypedList?> phenotypes)
+    cpdef void set_phenotypes(self, TypedList phenotypes) except *:
         cdef object phenotypes_item_type
 
-        phenotypes_item_type = setting_phenotypes.item_type()
+        phenotypes_item_type = phenotypes.item_type()
 
         if not is_sub_full_type(phenotypes_item_type, DefaultPhenotype):
             raise (

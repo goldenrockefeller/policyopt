@@ -28,9 +28,11 @@ cdef extern from "<valarray>" namespace "std" nogil:
         valarray operator- (const valarray&, const T&)
 
 cdef class TanhLayer(BaseDifferentiableMap):
+    cpdef TanhLayer copy(self, copy_obj = ?)
     cdef public BaseDifferentiableMap super_map
 
     cpdef Py_ssize_t n_parameters(self) except *
+
 
 cdef TanhLayer new_TanhLayer(BaseDifferentiableMap super_map)
 
@@ -49,9 +51,13 @@ cdef class ReluLinear(BaseDifferentiableMap):
     cdef public double leaky_scale # a hyperparameter, not a regular parameter
     cdef public bint linear1_is_fixed
 
+    cpdef ReluLinear copy(self, copy_obj = ?)
+
     cpdef tuple shape(self)
 
     cpdef Py_ssize_t n_parameters(self) except *
+
+
 
 cdef ReluLinear new_ReluLinear(
     Py_ssize_t n_in_dims,
@@ -75,11 +81,13 @@ cdef class Rbfn(BaseDifferentiableMap): # Radial Basis Function Network
     cdef public bint scalings_are_fixed
     cdef public bint normalizes_activations
 
+    cpdef Rbfn copy(self, copy_obj = ?)
+
     cpdef tuple shape(self)
 
     cpdef Py_ssize_t n_parameters(self) except *
 
-    cpdef activations_eval(self, input)
+    cpdef DoubleArray activations_eval(self, input)
 
 cdef Rbfn new_Rbfn(
     Py_ssize_t n_in_dims,

@@ -1,7 +1,7 @@
 from rockefeg.cyutil.array cimport DoubleArray
 
 cdef class BaseMap:
-    cpdef copy(self, copy_obj = ?)
+    cpdef BaseMap copy(self, copy_obj = ?)
 
     cpdef parameters(self)
     cpdef void set_parameters(self, parameters) except *
@@ -10,10 +10,13 @@ cdef class BaseMap:
     cpdef eval(self, input)
 
 cdef class BaseDifferentiableMap(BaseMap):
-    cpdef jacobian_wrt_parameters(self, input)
-    cpdef jacobian_wrt_input(self, input)
-    cpdef grad_wrt_parameters(self, input, output_grad = ?)
-    cpdef grad_wrt_input(self, input, output_grad = ?)
+    cpdef BaseDifferentiableMap copy(self, copy_obj = ?)
+
+    cpdef DoubleArray eval(self, input)
+    cpdef list jacobian_wrt_parameters(self, input)
+    cpdef list jacobian_wrt_input(self, input)
+    cpdef DoubleArray grad_wrt_parameters(self, input, output_grad = ?)
+    cpdef DoubleArray grad_wrt_input(self, input, output_grad = ?)
 
 cpdef list default_jacobian_wrt_parameters(
     BaseDifferentiableMap map,
@@ -24,10 +27,12 @@ cpdef list default_jacobian_wrt_input(
     DoubleArray input)
 
 cdef class ContinuousCriticMap(BaseMap):
-    cdef __super_map
+    cdef BaseMap __super_map
 
-    cpdef super_map(self)
-    cpdef void set_super_map(self, super_map) except *
+    cpdef ContinuousCriticMap copy(self, copy_obj = ?)
+
+    cpdef BaseMap super_map(self)
+    cpdef void set_super_map(self, BaseMap super_map) except *
 
 cdef ContinuousCriticMap new_ContinuousCriticMap(BaseMap super_map)
 cdef void init_ContinuousCriticMap(
@@ -36,10 +41,12 @@ cdef void init_ContinuousCriticMap(
     ) except *
 
 cdef class DifferentiableCriticMap(BaseDifferentiableMap):
-    cdef __super_map
+    cdef BaseDifferentiableMap __super_map
 
-    cpdef super_map(self)
-    cpdef void set_super_map(self, super_map) except *
+    cpdef DifferentiableCriticMap copy(self, copy_obj = ?)
+
+    cpdef BaseDifferentiableMap super_map(self)
+    cpdef void set_super_map(self, BaseDifferentiableMap super_map) except *
 
 cdef DifferentiableCriticMap new_DifferentiableCriticMap(
     BaseDifferentiableMap super_map)

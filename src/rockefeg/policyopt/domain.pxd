@@ -1,5 +1,5 @@
 cdef class BaseDomain:
-    cpdef copy(self, copy_obj = ?)
+    cpdef BaseDomain copy(self, copy_obj = ?)
 
     cpdef void prep_for_epoch(self) except *
 
