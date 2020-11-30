@@ -51,7 +51,7 @@ cdef TargetEntry new_TargetEntry():
 cdef class BaseFunctionApproximator(BaseMap):
 
     cpdef BaseFunctionApproximator copy(self, copy_obj = None):
-        raise NotImplementedError("Abstract method.")
+        pass
 
     cpdef void batch_update(self, BaseReadableTypedList entries) except *:
         raise NotImplementedError("Abstract method.")
