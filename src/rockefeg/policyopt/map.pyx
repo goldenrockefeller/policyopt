@@ -8,7 +8,7 @@ from .experience cimport ExperienceDatum
 cdef class BaseMap:
 
     cpdef BaseMap copy(self, copy_obj = None):
-        raise NotImplementedError("Abstract method.")
+        pass
 
     cpdef parameters(self):
         raise NotImplementedError("Abstract method.")
@@ -28,7 +28,7 @@ cdef class BaseMap:
 cdef class BaseDifferentiableMap(BaseMap):
 
     cpdef BaseDifferentiableMap copy(self, copy_obj = None):
-        raise NotImplementedError("Abstract method.")
+        pass
 
     cpdef DoubleArray parameters(self):
         raise NotImplementedError("Abstract method.")
