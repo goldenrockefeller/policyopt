@@ -1,11 +1,10 @@
 cimport cython
+import cython
 
 from .value_target cimport new_TotalRewardTargetSetter
 from .buffer cimport new_ShuffleBuffer
 from .experience cimport ExperienceDatum, new_ExperienceDatum
 from .function_approximation cimport TargetEntry
-from rockefeg.cyutil.typed_list cimport TypedList, new_TypedList
-from rockefeg.cyutil.typed_list cimport is_sub_full_type
 from rockefeg.cyutil.array cimport DoubleArray
 
 from libc.math cimport isfinite
@@ -60,6 +59,7 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef bint is_done_training(self) except *:
         return self.super_system().is_done_training()
 
+    @cython.locals(trajectory = list, target_entries = list)
     cpdef void prep_for_epoch(self) except *:
         cdef Py_ssize_t batch_id
         cdef Py_ssize_t trajectory_id
@@ -70,10 +70,9 @@ cdef class FitnessCriticSystem(BaseSystem):
         cdef ShuffleBuffer trajectory_buffer
         cdef ShuffleBuffer critic_target_buffer
         cdef BaseValueTargetSetter value_target_setter
-        cdef TypedList trajectory
-        cdef TypedList target_entries
+        trajectory: List[ExperienceDatum]
+        target_entries: List[TargetEntry]
         cdef TargetEntry target_entry
-        cdef list target_entry_list
         cdef BaseFunctionApproximator intermediate_critic
         cdef ExperienceDatum experience
 
@@ -101,17 +100,15 @@ cdef class FitnessCriticSystem(BaseSystem):
                         critic_target_buffer.add_staged_datum(target_entry)
 
 
-                target_entry_list = [None] * batch_size
+                target_entries = [None] * batch_size
 
                 for target_id in range(batch_size):
                     target_entry = critic_target_buffer.next_shuffled_datum()
-                    target_entry_list[target_id] = target_entry
+                    target_entries[target_id] = target_entry
 
-                target_entries = new_TypedList(TargetEntry)
-                target_entries.set_items(target_entry_list)
                 intermediate_critic.batch_update(target_entries)
             raise NotImplementedError("This function needs a redo")
-            print(intermediate_critic.eval(trajectory.item(0)).view[0])
+            print(intermediate_critic.eval(trajectory[0]).view[0])
 
         self.super_system().prep_for_epoch()
 
@@ -133,11 +130,11 @@ cdef class FitnessCriticSystem(BaseSystem):
         return action
 
     #step_wise feedback
+    @cython.locals(current_trajectory = list)
     cpdef void receive_feedback(self, feedback) except *:
         cdef ExperienceDatum experience
         cdef double new_feedback
         cdef BaseFunctionApproximator intermediate_critic
-        cdef TypedList current_trajectory
         cdef DoubleArray intermediate_eval
 
         intermediate_critic = self.intermediate_critic()
@@ -162,7 +159,7 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef void update_policy(self) except *:
         self.super_system().update_policy()
         self.trajectory_buffer().add_staged_datum(self.current_trajectory())
-        self._set_current_trajectory(new_TypedList(ExperienceDatum))
+        self._set_current_trajectory([])
 
     cpdef void receive_score(self, double score) except *:
         self.super_system().receive_score(score)
@@ -194,13 +191,7 @@ cdef class FitnessCriticSystem(BaseSystem):
 
         buffer_item_type = buffer.item_type()
 
-        if not is_sub_full_type(buffer_item_type, (TypedList, ExperienceDatum)):
-            raise (
-                TypeError(
-                    "The trajectory buffer's item type "
-                    "(buffer.item_type() = {buffer_item_type}) "
-                    "must be a subtype of a subtype of (TypedList, ExperienceDatum)."
-                    .format(**locals())))
+
 
         self.__trajectory_buffer = buffer
 
@@ -208,18 +199,6 @@ cdef class FitnessCriticSystem(BaseSystem):
         return self.__critic_target_buffer
 
     cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *:
-        cdef object buffer_item_type
-
-        buffer_item_type = buffer.item_type()
-
-        if not is_sub_full_type(buffer_item_type, TargetEntry):
-            raise (
-                TypeError(
-                    "The critic target entry buffer's item type "
-                    "(buffer.item_type() = {buffer_item_type}) "
-                    "must be a subtype of a subtype of TargetEntry."
-                    .format(**locals())))
-
         self.__critic_target_buffer = buffer
 
     cpdef BaseValueTargetSetter value_target_setter(self):
@@ -243,22 +222,19 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef void _set_current_action(self, action) except *:
             self.__current_action = action
 
-    cpdef BaseReadableTypedList current_trajectory(self):
+    cpdef list current_trajectory(self):
+        # type: (...) -> Sequence[ExperienceDatum]
         return self.__current_trajectory
 
-    cpdef void _set_current_trajectory(self, TypedList trajectory) except *:
-        cdef object trajectory_item_type
+    cpdef list _current_trajectory(self):
+        # type: (...) -> List[ExperienceDatum]
+        return self.__current_trajectory
 
-        trajectory_item_type = trajectory.item_type()
-
-        if trajectory_item_type is not ExperienceDatum:
-            raise (
-                TypeError(
-                    "The trjectory's item type "
-                    "(trajectory.item_type() = {trajectory_item_type}) "
-                    "must be a subtype of ExperienceDatum."
-                    .format(**locals())))
-
+    @cython.locals(trajectory = list)
+    cpdef void _set_current_trajectory(
+            self,
+            trajectory: List[ExperienceDatum]
+            ) except *:
         self.__current_trajectory = trajectory
 
     cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *:
@@ -330,11 +306,11 @@ cdef void init_FitnessCriticSystem(
 
     system.__super_system = super_system
     system.__intermediate_critic = intermediate_critic
-    system.__trajectory_buffer = new_ShuffleBuffer((TypedList, ExperienceDatum))
-    system.__critic_target_buffer = new_ShuffleBuffer(TargetEntry)
+    system.__trajectory_buffer = new_ShuffleBuffer()
+    system.__critic_target_buffer = new_ShuffleBuffer()
     system.__current_observation = None
     system.__current_action = None
-    system.__current_trajectory = new_TypedList(ExperienceDatum)
+    system.__current_trajectory = []
     system.__critic_update_batch_size = 1
     system.__n_trajectories_per_critic_update_batch = 1
     system.__n_critic_update_batches_per_epoch = 1

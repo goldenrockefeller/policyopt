@@ -1,43 +1,46 @@
 cimport cython
-
-from rockefeg.cyutil.typed_list cimport TypedList, new_TypedList
-from rockefeg.cyutil.typed_list cimport new_FixedLenTypedList
-
+import cython
 import numpy as np
+
+from typing import Generic, List, Sequence, TypeVar
+
+# todo make an ImmutableShuffleBuffer class
+
+T = TypeVar('T')
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
-cdef class ShuffleBuffer:
-    def __init__(self, item_type):
-        init_ShuffleBuffer(self, item_type)
+cdef class ShuffleBuffer():
+    def __init__(self):
+        init_ShuffleBuffer(self)
 
+    @cython.locals(shuffled_data = list)
     cpdef ShuffleBuffer copy(self, copy_obj = None):
         cdef ShuffleBuffer new_buffer
-        cdef list shuffled_data_list
+        shuffled_data: List[T]
 
         if copy_obj is None:
             new_buffer = ShuffleBuffer.__new__(ShuffleBuffer)
         else:
             new_buffer = copy_obj
 
-        new_buffer.__staged_data = self.__staged_data.shallow_copy()
+        new_buffer.__staged_data = self.__staged_data.copy()
 
-        new_buffer.__shuffled_data = self.__shuffled_data.shallow_copy()
+        new_buffer.__shuffled_data = self.__shuffled_data.copy()
 
         new_buffer.__capacity = self.__capacity
         new_buffer.__buffer_pos = self.__buffer_pos
-        new_buffer.__item_type = self.__item_type
 
         # Reshuffle the new buffer to decorrelate with self buffer.
         # TODO: .shuffle  can be optimized
-        shuffled_data_list =  self.__shuffled_data.items_shallow_copy()
-        np.random.shuffle(shuffled_data_list)
-        self.__shuffled_data.set_items(shuffled_data_list)
+        shuffled_data =  self.__shuffled_data.copy()
+        np.random.shuffle(shuffled_data)
+        self.__shuffled_data = shuffled_data
 
         return new_buffer
 
     cpdef void add_staged_datum(self, datum) except *:
-        cdef TypedList staged_data
+        cdef staged_data
         cdef Py_ssize_t buffer_pos
 
         staged_data = self._staged_data()
@@ -47,19 +50,15 @@ cdef class ShuffleBuffer:
         else:
             # Replace at buffer position and move the buffer position.
             buffer_pos = self._buffer_pos()
-            staged_data.set_item(buffer_pos, datum)
+            staged_data[buffer_pos] =  datum
             buffer_pos += 1
             if buffer_pos == self.capacity():
                 buffer_pos = 0
             self._set_buffer_pos(buffer_pos)
 
+    @cython.locals(new_shuffled_data = list)
     cpdef next_shuffled_datum(self):
-        cdef list shuffled_data_list
-        cdef TypedList shuffled_data
-        cdef TypedList staged_data
-
-        staged_data = self._staged_data()
-        shuffled_data = self._shuffled_data()
+        new_shuffled_data: List[T]
 
         if self.is_empty():
             raise (
@@ -67,23 +66,17 @@ cdef class ShuffleBuffer:
                     "Can not get next shuffled datum when the buffer is empty. "
                     "(self.is_empty() = True)" ))
 
-        if len(shuffled_data) == 0:
-            if len(staged_data) == 0:
-                raise (
-                    RuntimeError(
-                        "Something went wrong: Buffer may or may not be empty"))
-            else:
-                # TODO .shuffle() can be optimized
-                shuffled_data_list =  staged_data.items_shallow_copy()
-                np.random.shuffle(shuffled_data_list)
-                shuffled_data.set_items(shuffled_data_list)
+        # TODO .shuffle() can be optimized
+        new_shuffled_data =  self.staged_data().copy()
+        np.random.shuffle(new_shuffled_data)
+        self._set_shuffled_data(new_shuffled_data)
 
-        return shuffled_data.pop()
+        return self._shuffled_data().pop()
 
 
     cpdef void clear(self) except *:
-        self._staged_data().set_items([])
-        self._shuffled_data().set_items([])
+        self._set_staged_data([])
+        self._set_shuffled_data([])
         self._set_buffer_pos(0)
 
     cpdef bint is_empty(self) except *:
@@ -94,11 +87,13 @@ cdef class ShuffleBuffer:
     cpdef Py_ssize_t capacity(self) except *:
         return self.__capacity
 
+    @cython.locals(staged_data = list, new_staged_data = list)
     cpdef void set_capacity(self, Py_ssize_t capacity) except *:
-        cdef list new_staged_data
+
         cdef Py_ssize_t buffer_pos
         cdef Py_ssize_t datum_id
-        cdef TypedList staged_data
+        staged_data: List[T]
+        new_staged_data: List[T]
 
         staged_data = self._staged_data()
 
@@ -117,12 +112,12 @@ cdef class ShuffleBuffer:
                 buffer_pos -= self.__capacity
 
             for datum_id in range(len(new_staged_data)):
-                new_staged_data[datum_id] = staged_data.item(buffer_pos)
+                new_staged_data[datum_id] = staged_data[buffer_pos]
                 buffer_pos += 1
                 if buffer_pos > self.__capacity:
                     buffer_pos -= self.__capacity
 
-            staged_data.set_items(new_staged_data)
+            self._set_staged_data(new_staged_data)
             self._set_buffer_pos(0)
 
         self.__capacity = capacity
@@ -152,39 +147,45 @@ cdef class ShuffleBuffer:
 
         self.__buffer_pos = buffer_pos
 
-    cpdef BaseReadableTypedList staged_data(self):
+    cpdef list staged_data(self):
+        # type: (...) -> Sequence[T]
         return self.__staged_data
 
-    cpdef TypedList _staged_data(self):
+    cpdef list _staged_data(self):
+        # type: (...) -> List[T]
         return self.__staged_data
 
+    @cython.locals(staged_data = list)
+    cpdef void _set_staged_data(self, staged_data: List[T]) except *:
+        self.__staged_data = staged_data
 
-    cpdef BaseReadableTypedList shuffled_data(self):
+    cpdef list shuffled_data(self):
+        # type: (...) -> Sequence[T]
         return self.__shuffled_data
 
-    cpdef TypedList _shuffled_data(self):
+    cpdef list _shuffled_data(self):
+        # type: (...) -> list[T]
         return self.__shuffled_data
 
-    cpdef item_type(self):
-        return self.__item_type
-
+    @cython.locals(shuffled_data = list)
+    cpdef void _set_shuffled_data(self, shuffled_data: List[T])  except *:
+        self.__shuffled_data = shuffled_data
 
 @cython.warn.undeclared(True)
-cdef ShuffleBuffer new_ShuffleBuffer(item_type):
+cdef ShuffleBuffer new_ShuffleBuffer():
     cdef ShuffleBuffer buffer
 
     buffer = ShuffleBuffer.__new__(ShuffleBuffer)
-    init_ShuffleBuffer(buffer, item_type)
+    init_ShuffleBuffer(buffer)
 
     return buffer
 
 @cython.warn.undeclared(True)
-cdef void init_ShuffleBuffer(ShuffleBuffer buffer, item_type) except *:
+cdef void init_ShuffleBuffer(ShuffleBuffer buffer) except *:
     if buffer is None:
         raise TypeError("The buffer (buffer) cannot be None.")
 
-    buffer.__staged_data = new_TypedList(item_type)
-    buffer.__shuffled_data = new_TypedList(item_type)
+    buffer.__staged_data = []
+    buffer.__shuffled_data = []
     buffer.__capacity = 1
     buffer.__buffer_pos = 0
-    buffer.__item_type = item_type

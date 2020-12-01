@@ -1,9 +1,10 @@
-from rockefeg.cyutil.typed_list cimport TypedList, BaseReadableTypedList
+import cython
+from typing import List
 
-cdef class ShuffleBuffer:
-    cdef TypedList __shuffled_data
-    cdef TypedList __staged_data
-    cdef __item_type
+
+cdef class ShuffleBuffer() :
+    cdef list __shuffled_data
+    cdef list __staged_data
     cdef Py_ssize_t __capacity
     cdef Py_ssize_t __buffer_pos
 
@@ -16,7 +17,6 @@ cdef class ShuffleBuffer:
     cpdef void clear(self) except *
 
     cpdef bint is_empty(self) except *
-    # pos too
 
     cpdef Py_ssize_t capacity(self) except *
     cpdef void set_capacity(self, Py_ssize_t capacity) except *
@@ -24,14 +24,27 @@ cdef class ShuffleBuffer:
     cpdef Py_ssize_t _buffer_pos(self) except *
     cpdef void _set_buffer_pos(self, Py_ssize_t buffer_pos) except *
 
-    cpdef BaseReadableTypedList staged_data(self)
-    cpdef TypedList _staged_data(self)
 
-    cpdef BaseReadableTypedList shuffled_data(self)
-    cpdef TypedList _shuffled_data(self)
+    cpdef list staged_data(self)
+    # type: (...) -> Sequence[T]
 
-    cpdef item_type(self)
+    cpdef list _staged_data(self)
+    # type: (...) -> List[T]
+
+    @cython.locals(staged_data = list)
+    cpdef void _set_staged_data(self, staged_data: List[T]) except *
 
 
-cdef ShuffleBuffer new_ShuffleBuffer(item_type)
-cdef void init_ShuffleBuffer(ShuffleBuffer buffer, item_type) except *
+    cpdef list shuffled_data(self)
+    # type: (...) -> Sequence[T]
+
+    cpdef list _shuffled_data(self)
+    # type: (...) -> List[T]
+
+    @cython.locals(shuffled_data = list)
+    cpdef void _set_shuffled_data(self, shuffled_data: List[T])  except *
+
+
+
+cdef ShuffleBuffer new_ShuffleBuffer()
+cdef void init_ShuffleBuffer(ShuffleBuffer buffer) except *

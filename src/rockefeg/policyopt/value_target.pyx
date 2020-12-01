@@ -3,8 +3,9 @@ cimport cython
 from .function_approximation cimport TargetEntry, new_TargetEntry
 from .experience cimport ExperienceDatum
 from rockefeg.cyutil.array cimport new_DoubleArray
-from rockefeg.cyutil.typed_list cimport BaseReadableTypedList, new_TypedList
-from rockefeg.cyutil.typed_list cimport is_sub_full_type, TypedList
+
+import cython
+from typing import List, Sequence
 
 @cython.warn.undeclared(True)
 cpdef DoubleArray concatenation_of_DoubleArray(
@@ -29,60 +30,42 @@ cpdef DoubleArray concatenation_of_DoubleArray(
 
 
 @cython.warn.undeclared(True)
-cpdef DoubleArray rewards_from_path(BaseReadableTypedList path):
+@cython.locals(trajectory = list)
+cpdef DoubleArray rewards_from_trajectory(trajectory: Sequence[ExperienceDatum]):
     cdef ExperienceDatum experience
     cdef Py_ssize_t experience_id
     cdef DoubleArray rewards
-    cdef object path_item_type
 
-    path_item_type = path.item_type()
+    rewards = new_DoubleArray(len(trajectory))
 
-    if not is_sub_full_type(path_item_type, ExperienceDatum):
-        raise (
-            TypeError(
-                "The path list's item type "
-                "(path.item_type() = {path_item_type}) "
-                "must be a subtype of ExperienceDatum."
-                .format(**locals())))
-
-    rewards = new_DoubleArray(len(path))
-
-    for experience_id in range(len(path)):
-        experience = path.item(experience_id)
+    for experience_id in range(len(trajectory)):
+        experience = trajectory[experience_id]
         rewards.view[experience_id] = experience.reward
 
     return rewards
 
 @cython.warn.undeclared(True)
+@cython.locals(trajectory = list)
 cpdef DoubleArray q_value_evals(
-        BaseReadableTypedList path,
+        trajectory: Sequence[ExperienceDatum],
         BaseMap critic):
     cdef ExperienceDatum experience
     cdef Py_ssize_t experience_id
     cdef DoubleArray q_values
     cdef DoubleArray critic_eval_array
-    cdef object path_item_type
 
-    if path is None:
-        raise TypeError("The path (path) cannot be None.")
+    if trajectory is None:
+        raise TypeError("The trajectory (trajectory) cannot be None.")
 
     if critic is None:
         raise TypeError("The critic (critic) cannot be None.")
 
-    path_item_type =  path.item_type()
 
-    if not is_sub_full_type(path.item_type(), ExperienceDatum):
-        raise (
-            TypeError(
-                "The path list's item type "
-                "(path.item_type() = {path_item_type}) "
-                "must be a subtype of ExperienceDatum."
-                .format(**locals())))
 
-    q_values = new_DoubleArray(len(path))
+    q_values = new_DoubleArray(len(trajectory))
 
-    for experience_id in range(len(path)):
-        experience = path.item(experience_id)
+    for experience_id in range(len(trajectory)):
+        experience = trajectory[experience_id]
         critic_eval_array = critic.eval(experience)
         q_values.view[experience_id] = critic_eval_array.view[0]
 
@@ -356,49 +339,37 @@ cpdef DoubleArray tail_subtracted_trace(
     return new_trace
 
 
-@cython.warn.undeclared(True)
-cpdef value_target_entries(
-        BaseReadableTypedList path,
+@cython.locals(trajectory = list, entries = list)
+cpdef list value_target_entries(
+        trajectory: Seqeunce[ExperienceDatum],
         DoubleArray target_values):
-    cdef TypedList entries_typed_list
-    cdef list entries
+    # type: (...) -> List[TargetEntry]
+    entries: List[TargetEntry]
     cdef Py_ssize_t entry_id
     cdef DoubleArray target
     cdef TargetEntry target_entry
-    cdef object path_item_type
 
-    if path is None:
-        raise TypeError("The path (path) cannot be None.")
+    if trajectory is None:
+        raise TypeError("The trajectory (trajectory) cannot be None.")
 
     if target_values is None:
         raise (
             TypeError(
                 "The target values vector (target_values) cannot be None."))
 
-    path_item_type =  path.item_type()
 
-    if not is_sub_full_type(path.item_type(), ExperienceDatum):
-        raise (
-            TypeError(
-                "The path list's item type "
-                "(path.item_type() = {path_item_type}) "
-                "must be a subtype of ExperienceDatum."
-                .format(**locals())))
 
-    entries = [None] * len(path)
+    entries = [None] * len(trajectory)
 
     for entry_id in range(len(entries)):
         target = new_DoubleArray(1)
         target.view[0] = target_values.view[entry_id]
         target_entry = new_TargetEntry()
-        target_entry.input = path.item(entry_id)
+        target_entry.input = trajectory[entry_id]
         target_entry.target = target
         entries[entry_id] = target_entry
 
-    entries_typed_list = new_TypedList(TargetEntry)
-    entries_typed_list.set_items(entries)
-
-    return entries_typed_list
+    return entries
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -406,7 +377,10 @@ cdef class BaseValueTargetSetter:
     cpdef BaseValueTargetSetter copy(self, copy_obj = None):
         pass
 
-    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
+    @cython.locals(trajectory = list)
+    cpdef list value_target_entries(
+            self,
+            trajectory: Sequence[ExperienceDatum]):
         raise NotImplementedError("Abstract method.")
 
 @cython.warn.undeclared(True)
@@ -427,36 +401,28 @@ cdef class TotalRewardTargetSetter(BaseValueTargetSetter):
 
         return new_target_setter
 
-    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
+    @cython.locals(trajectory = list, value_target_entries_ret = list)
+    cpdef list value_target_entries(
+            self,
+            trajectory: Sequence[ExperienceDatum]):
+        # type: (...) -> Sequence[TargetEntry]
+        value_target_entries_ret: Sequence[TargetEntry]
         cdef Py_ssize_t experience_id
-        cdef list value_target_entries_list
-        cdef BaseReadableTypedList value_target_entries_ret
         cdef DoubleArray target_values
         cdef double total_reward
         cdef ExperienceDatum experience #
-        cdef object path_item_type
 
-        path_item_type = path.item_type()
-
-        if not is_sub_full_type(path_item_type, ExperienceDatum):
-            raise (
-                TypeError(
-                    "The path list's item type "
-                    "(path.item_type() = {path_item_type}) "
-                    "must be a subtype of ExperienceDatum."
-                    .format(**locals())))
-
-        # Add up all rewards from both paths
+        # Add up all rewards from both trajectorys
         total_reward = 0
-        for experience in path:
+        for experience in trajectory:
             total_reward += experience.reward
 
-        target_values = new_DoubleArray(len(path))
+        target_values = new_DoubleArray(len(trajectory))
         target_values.set_all_to(total_reward)
 
         value_target_entries_ret = (
             value_target_entries(
-                path,
+                trajectory,
                 target_values ))
 
         return value_target_entries_ret
@@ -510,42 +476,35 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
         raise NotImplementedError("Abstract method.")
 
 
-    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
+    @cython.locals(trajectory = list, value_target_entries_ret = list)
+    cpdef list value_target_entries(
+            self,
+            trajectory: Sequence[ExperienceDatum]):
+        # type: (...) -> Sequence[TargetEntry]
+        value_target_entries_ret: Sequence[TargetEntry]
         cdef DoubleArray trace
         cdef DoubleArray q_values
         cdef DoubleArray rewards
         cdef DoubleArray q_updates
         cdef DoubleArray target_updates
         cdef DoubleArray target_values
-        cdef BaseReadableTypedList value_target_entries_ret
         cdef Py_ssize_t trace_len
         cdef Py_ssize_t target_id
-        cdef Py_ssize_t path_len
+        cdef Py_ssize_t trajectory_len
         cdef Py_ssize_t n_q_updates
         cdef Py_ssize_t min_lookahead
-        cdef object path_item_type
 
-        path_item_type = path.item_type()
-
-        if not is_sub_full_type(path_item_type, ExperienceDatum):
-            raise (
-                TypeError(
-                    "The path list's item type "
-                    "(path.item_type() = {path_item_type}) "
-                    "must be a subtype of ExperienceDatum."
-                    .format(**locals())))
-
-        path_len = len(path)
+        trajectory_len = len(trajectory)
         if self.uses_terminal_step():
-            n_q_updates = path_len
+            n_q_updates = trajectory_len
         else:
-            n_q_updates = path_len - 1
+            n_q_updates = trajectory_len - 1
 
         min_lookahead = self.min_lookahead()
         if n_q_updates < min_lookahead + 1:
             raise (
                 IndexError(
-                    "The number of Q updates to calculate (len(path) - 1 + "
+                    "The number of Q updates to calculate (len(trajectory) - 1 + "
                     "self.uses_terminal_step() = {n_q_updates}) "
                     "must not be less "
                     "than 1 plus the minimum lookahead for target updates  "
@@ -560,9 +519,9 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
         #
         trace = self.trace(trace_len)
 
-        rewards = rewards_from_path(path)
+        rewards = rewards_from_trajectory(trajectory)
 
-        q_values = q_value_evals(path, self.critic())
+        q_values = q_value_evals(trajectory, self.critic())
 
         q_updates = (
             sarsa_q_update_evals(
@@ -586,7 +545,7 @@ cdef class BaseTdTargetSetter(BaseValueTargetSetter):
 
         value_target_entries_ret = (
             value_target_entries(
-                path,
+                trajectory,
                 target_values ))
 
         return value_target_entries_ret
@@ -705,46 +664,39 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
 
     # TODO: backward view for TD eligibity traces (more efficient)
 
-    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
+    @cython.locals(trajectory = list, value_target_entries_ret = list)
+    cpdef list value_target_entries(
+            self,
+            trajectory: Sequence[ExperienceDatum]):
+        # type: (...) -> Sequence[TargetEntry]
+        value_target_entries_ret: Sequence[TargetEntry]
         cdef DoubleArray trace
         cdef DoubleArray q_values
         cdef DoubleArray rewards
         cdef DoubleArray q_updates
         cdef DoubleArray target_updates
         cdef DoubleArray target_values
-        cdef BaseReadableTypedList value_target_entries_ret
         cdef Py_ssize_t trace_len
         cdef Py_ssize_t target_id
-        cdef Py_ssize_t path_len
+        cdef Py_ssize_t trajectory_len
         cdef Py_ssize_t n_q_updates
         cdef Py_ssize_t min_lookahead
-        cdef object path_item_type
-
-        path_item_type = path.item_type()
-
-        if not is_sub_full_type(path_item_type, ExperienceDatum):
-            raise (
-                TypeError(
-                    "The path list's item type "
-                    "(path.item_type() = {path_item_type}) "
-                    "must be a subtype of ExperienceDatum."
-                    .format(**locals())))
 
         if not self.redistributes_trace_tail():
-            return BaseTdTargetSetter.value_target_entries(self, path)
+            return BaseTdTargetSetter.value_target_entries(self, trajectory)
 
         else:
             min_lookahead = self.min_lookahead()
-            path_len = len(path)
+            trajectory_len = len(trajectory)
             if self.uses_terminal_step():
-                n_q_updates = path_len
+                n_q_updates = trajectory_len
             else:
-                n_q_updates = path_len - 1
+                n_q_updates = trajectory_len - 1
 
             if n_q_updates < min_lookahead + 1:
                 raise (
                     IndexError(
-                        "The number of Q updates to calculate (len(path) - 1 + "
+                        "The number of Q updates to calculate (len(trajectory) - 1 + "
                         "self.uses_terminal_step() = {n_q_updates}) "
                         "must not be less "
                         "than 1 plus the minimum lookahead for target updates  "
@@ -759,9 +711,9 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
             #
             trace = self.trace(trace_len)
 
-            rewards = rewards_from_path(path)
+            rewards = rewards_from_trajectory(trajectory)
 
-            q_values = q_value_evals(path, self.critic())
+            q_values = q_value_evals(trajectory, self.critic())
 
             q_updates = (
                 sarsa_q_update_evals(
@@ -786,7 +738,7 @@ cdef class TdLambdaTargetSetter(BaseTdTargetSetter):
 
             value_target_entries_ret = (
                 value_target_entries(
-                    path,
+                    trajectory,
                     target_values ))
 
             return value_target_entries_ret
@@ -912,46 +864,40 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
 
         return trace
 
-    cpdef TypedList value_target_entries(self, BaseReadableTypedList path):
+    @cython.locals(trajectory = list, value_target_entries_ret = list)
+    cpdef list value_target_entries(
+            self,
+            trajectory: Sequence[ExperienceDatum]):
+        # type: (...) -> Sequence[TargetEntry]
+        value_target_entries_ret: Sequence[TargetEntry]
         cdef DoubleArray trace
         cdef DoubleArray q_values
         cdef DoubleArray rewards
         cdef DoubleArray q_updates
         cdef DoubleArray target_updates
         cdef DoubleArray target_values
-        cdef BaseReadableTypedList value_target_entries_ret
         cdef Py_ssize_t trace_len
         cdef Py_ssize_t target_id
-        cdef Py_ssize_t path_len
+        cdef Py_ssize_t trajectory_len
         cdef Py_ssize_t n_q_updates
         cdef Py_ssize_t min_lookahead
-        cdef object path_item_type
 
-        path_item_type = path.item_type()
-
-        if not is_sub_full_type(path_item_type, ExperienceDatum):
-            raise (
-                TypeError(
-                    "The path list's item type "
-                    "(path.item_type() = {path_item_type}) "
-                    "must be a subtype of ExperienceDatum."
-                    .format(**locals())))
 
         if not self.normalizes_trace_variance():
-            return BaseTdTargetSetter.value_target_entries(self, path)
+            return BaseTdTargetSetter.value_target_entries(self, trajectory)
 
         else:
             min_lookahead = self.min_lookahead()
-            path_len = len(path)
+            trajectory_len = len(trajectory)
             if self.uses_terminal_step():
-                n_q_updates = path_len
+                n_q_updates = trajectory_len
             else:
-                n_q_updates = path_len - 1
+                n_q_updates = trajectory_len - 1
 
             if n_q_updates < min_lookahead + 1:
                 raise (
                     IndexError(
-                        "The number of Q updates to calculate (len(path) - 1 + "
+                        "The number of Q updates to calculate (len(trajectory) - 1 + "
                         "self.uses_terminal_step() = {n_q_updates}) "
                         "must not be less "
                         "than 1 plus the minimum lookahead for target updates  "
@@ -966,9 +912,9 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
             #
             trace = self.trace(trace_len)
 
-            rewards = rewards_from_path(path)
+            rewards = rewards_from_trajectory(trajectory)
 
-            q_values = q_value_evals(path, self.critic())
+            q_values = q_value_evals(trajectory, self.critic())
 
             q_updates = (
                 sarsa_q_update_evals(
@@ -993,7 +939,7 @@ cdef class TdHeavyTargetSetter(BaseTdTargetSetter):
 
             value_target_entries_ret = (
                 value_target_entries(
-                    path,
+                    trajectory,
                     target_values ))
 
             return value_target_entries_ret

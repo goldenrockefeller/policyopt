@@ -1,16 +1,24 @@
 from .system cimport BaseSystem
-from rockefeg.cyutil.typed_list cimport TypedList
 
+import cython
+
+from typing import Sequence
 
 
 cdef class MultiagentSystem(BaseSystem):
-    cdef TypedList __agent_systems
+    cdef list __agent_systems
     # list<BaseSystem>[n_agents] __agent_systems
 
     cpdef MultiagentSystem copy(self, copy_obj = ?)
 
-    cpdef TypedList agent_systems(self)
-    cpdef void set_agent_systems(self, TypedList agent_systems) except *
+    cpdef list agent_systems(self)
+    # type: (...) -> List[T]
+
+    @cython.locals(agent_systems = list)
+    cpdef void set_agent_systems(
+        self,
+        agent_systems: Sequence[T]
+        ) except *
 
 cdef MultiagentSystem new_MultiagentSystem()
 cdef void init_MultiagentSystem(MultiagentSystem system) except *

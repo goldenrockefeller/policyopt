@@ -1,8 +1,14 @@
 cimport cython
 from .system cimport BaseSystem
-from rockefeg.cyutil.typed_list cimport BaseReadableTypedList,  new_TypedList
-from rockefeg.cyutil.typed_list cimport is_sub_full_type
+from .system import BaseSystem
 
+import cython
+from typing import Generic, TypeVar, List, Sequence
+
+T = TypeVar('T', bound = BaseSystem)
+ActionT = TypeVar('ActionT')
+ObservationT = TypeVar('ObservationT')
+FeedbackT = TypeVar('FeedbackT')
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -13,7 +19,6 @@ cdef class MultiagentSystem(BaseSystem):
     cpdef MultiagentSystem copy(self, copy_obj = None):
         cdef MultiagentSystem new_system
         cdef BaseSystem agent_system
-        cdef list new_agent_systems_list
         cdef Py_ssize_t agent_id
 
         if copy_obj is None:
@@ -21,13 +26,11 @@ cdef class MultiagentSystem(BaseSystem):
         else:
             new_system = copy_obj
 
-
-        new_agent_systems_list  = [None] * len(self.__agent_systems)
+        # Deep copy.
+        new_system.__agent_systems  = [None] * len(self.__agent_systems)
         for agent_id in range(len(self.__agent_systems)):
-            agent_system = self.__agent_systems.item(agent_id)
-            new_agent_systems_list[new_agent_systems_list] = agent_system.copy()
-        new_system.__agent_systems = new_TypedList(BaseSystem)
-        new_system.__agent_systems.set_items(new_agent_systems_list)
+            agent_system = self.__agent_systems[agent_id]
+            new_system.__agent_systems[agent_id] = agent_system.copy()
 
         return new_system
 
@@ -61,13 +64,16 @@ cdef class MultiagentSystem(BaseSystem):
 
         return  is_ready_for_evaluation
 
-
+    @cython.locals(
+        agent_systems = list,
+        joint_action = list,
+        joint_observation = list)
     cpdef action(self, observation):
-        cdef list joint_action
-        cdef list joint_observation
+        joint_action: List[ActionT]
+        joint_observation: List[ObservationT]
         cdef BaseSystem system
         cdef Py_ssize_t agent_id
-        cdef BaseReadableTypedList agent_systems
+        agent_systems: Sequence[T]
 
         agent_systems = self.agent_systems()
 
@@ -76,25 +82,26 @@ cdef class MultiagentSystem(BaseSystem):
         joint_action = [None] * len(self.agent_systems())
 
         for agent_id in range(len(self.agent_systems())):
-            system = agent_systems.item(agent_id)
+            system = agent_systems[agent_id]
             joint_action[agent_id] = system.action(joint_observation[agent_id])
 
         return joint_action
 
 
     #step_wise feedback
-    cpdef void receive_feedback(self, feedback) except *:
-        cdef list cy_feedback
+    @cython.locals(agent_systems = list, cy_feedback = list)
+    cpdef void receive_feedback(self, feedback: Sequence[FeedbackT]) except *:
+        cy_feedback: Sequence[FeedbackT]
         cdef BaseSystem system
         cdef Py_ssize_t agent_id
-        cdef BaseReadableTypedList agent_systems
+        agent_systems: List[T]
 
         agent_systems = self.agent_systems()
 
         cy_feedback = feedback
 
         for agent_id in range(len(self.agent_systems())):
-            system = agent_systems.item(agent_id)
+            system = agent_systems[agent_id]
             system.receive_feedback(cy_feedback[agent_id])
 
     cpdef void update_policy(self) except *:
@@ -115,22 +122,12 @@ cdef class MultiagentSystem(BaseSystem):
         for system in self.agent_systems():
             system.output_final_log(log_dirname, datetime_str)
 
-    cpdef TypedList agent_systems(self):
+    cpdef list agent_systems(self):
+        # type: (...) -> List[T]
         return self.__agent_systems
 
-    cpdef void set_agent_systems(self, TypedList agent_systems) except *:
-        cdef object systems_item_type
-
-        systems_item_type = agent_systems.item_type()
-
-        if not is_sub_full_type(systems_item_type, BaseSystem):
-            raise (
-                TypeError(
-                    "The agent system's item type "
-                    "(agent_systems.item_type() = {systems_item_type}) "
-                    "must be a subtype of BaseSystem."
-                    .format(**locals())))
-
+    @cython.locals(agent_systems = list)
+    cpdef void set_agent_systems(self, agent_systems: List[T]) except *:
         self.__agent_systems = agent_systems
 
 @cython.warn.undeclared(True)
@@ -147,4 +144,4 @@ cdef void init_MultiagentSystem(MultiagentSystem system) except *:
     if system is None:
         raise TypeError("The system (system) cannot be None.")
 
-    system.__agent_systems = new_TypedList(BaseSystem)
+    system.__agent_systems = []

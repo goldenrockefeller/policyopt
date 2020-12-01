@@ -1,6 +1,10 @@
+import cython
+
 from .system cimport BaseSystem
 from .map cimport BaseMap
-from rockefeg.cyutil.typed_list cimport TypedList, BaseReadableTypedList
+
+from typing import List, Seqeunce, Generic
+
 
 cdef class BasePhenotype:
     cdef BaseMap __policy
@@ -50,9 +54,10 @@ cdef void init_DefaultPhenotype(
     BaseMap policy
     ) except *
 
+# T must be a BasePhenotype
 cdef class BaseEvolvingSystem(BaseSystem):
-    cdef TypedList __phenotypes
-    cdef TypedList __unevaluated_phenotypes
+    cdef list __phenotypes
+    cdef list __unevaluated_phenotypes
     cdef BasePhenotype __best_phenotype
     cdef BasePhenotype __acting_phenotype
     cdef Py_ssize_t __max_n_epochs
@@ -62,12 +67,23 @@ cdef class BaseEvolvingSystem(BaseSystem):
 
     cpdef void operate(self) except *
 
-    cpdef TypedList phenotypes(self)
-    cpdef void set_phenotypes(self, TypedList phenotypes) except *
+    cpdef list phenotypes(self)
+    # type: (...) -> List[T]
 
-    cpdef BaseReadableTypedList unevaluated_phenotypes(self)
-    cpdef TypedList _unevaluated_phenotypes(self)
-    cpdef void _set_unevaluated_phenotypes(self, TypedList phenotypes) except *
+    @cython.locals(phenotypes = list)
+    cpdef void set_phenotypes(self, phenotypes: List[T]) except *
+
+    cpdef list unevaluated_phenotypes(self)
+    # type: (...) -> Sequence[T]
+
+    cpdef list _unevaluated_phenotypes(self)
+    # type: (...) -> List[T]
+
+    @cython.locals(phenotypes = list)
+    cpdef void _set_unevaluated_phenotypes(
+        self,
+        phenotypes: List[T]
+        ) except *
 
     cpdef Py_ssize_t max_n_epochs(self) except *
     cpdef void set_max_n_epochs(self, Py_ssize_t max_n_epochs) except *

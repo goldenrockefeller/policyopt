@@ -1,7 +1,9 @@
 
 from .map cimport BaseMap
 from rockefeg.cyutil.array cimport DoubleArray
-from rockefeg.cyutil.typed_list cimport TypedList, BaseReadableTypedList
+
+import cython
+from typing import List, Seqeunce
 
 cpdef DoubleArray concatenation_of_DoubleArray(
     DoubleArray arr1,
@@ -10,7 +12,8 @@ cpdef DoubleArray concatenation_of_DoubleArray(
 cdef class BaseValueTargetSetter:
     cpdef BaseValueTargetSetter copy(self, copy_obj = ?)
 
-    cpdef TypedList value_target_entries(self, BaseReadableTypedList path)
+    @cython.locals(trajectory = list)
+    cpdef list value_target_entries(self, trajectory: Sequence[ExperienceDatum])
 
 
 cdef class TotalRewardTargetSetter(BaseValueTargetSetter):

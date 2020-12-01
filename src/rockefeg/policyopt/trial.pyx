@@ -179,7 +179,7 @@ cdef class Trial:
         system = self.system
         domain = self.domain
         
-        # start = perf_counter()
+        start = perf_counter()
         
         if self.saves:
             pass # Need to check that time difference is significant
@@ -254,9 +254,9 @@ cdef class Trial:
                     self.save()
                 time(&last_save_time)
             
-            # end = perf_counter()
-            # print(end-start)
-            # start = end
+            end = perf_counter()
+            print(end-start)
+            start = end
         
 
         self.log_score_history()

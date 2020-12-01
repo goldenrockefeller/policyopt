@@ -2,7 +2,9 @@ from .system cimport BaseSystem
 from .function_approximation cimport BaseFunctionApproximator
 from .buffer cimport ShuffleBuffer
 from .value_target cimport BaseValueTargetSetter
-from rockefeg.cyutil.typed_list cimport TypedList, BaseReadableTypedList
+
+import cython
+from typing import List, Sequence
 
 cdef class FitnessCriticSystem(BaseSystem):
     cdef BaseSystem __super_system
@@ -12,7 +14,7 @@ cdef class FitnessCriticSystem(BaseSystem):
     cdef BaseValueTargetSetter __value_target_setter
     cdef __current_observation
     cdef __current_action
-    cdef TypedList __current_trajectory
+    cdef list __current_trajectory
     cdef Py_ssize_t __n_trajectories_per_critic_update_batch
     cdef Py_ssize_t __critic_update_batch_size
     cdef Py_ssize_t __n_critic_update_batches_per_epoch
@@ -44,10 +46,16 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef current_action(self)
     cpdef void _set_current_action(self, action) except *
 
-    cpdef BaseReadableTypedList current_trajectory(self)
+    cpdef list current_trajectory(self)
+    # type: (...) -> Sequence[ExperienceDatum]
+
+    cpdef list _current_trajectory(self)
+    # type: (...) -> List[ExperienceDatum]
+
+    @cython.locals(trajectory = list)
     cpdef void _set_current_trajectory(
         self,
-        TypedList trajectory
+        trajectory: List[ExperienceDatum]
         ) except *
 
     cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *

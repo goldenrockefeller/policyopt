@@ -1,6 +1,8 @@
 from .map cimport BaseMap, BaseDifferentiableMap
 from rockefeg.cyutil.array cimport DoubleArray
-from rockefeg.cyutil.typed_list cimport BaseReadableTypedList
+
+import cython
+from typing import Sequence
 
 cdef class TargetEntry:
     cdef public object input
@@ -13,7 +15,8 @@ cdef TargetEntry new_TargetEntry()
 cdef class BaseFunctionApproximator(BaseMap):
     cpdef BaseFunctionApproximator copy(self, copy_obj = ?)
 
-    cpdef void batch_update(self, BaseReadableTypedList entries) except *
+    @cython.locals(entries = list)
+    cpdef void batch_update(self, entries: Sequence[TargetEntry]) except *
 
 
 cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):

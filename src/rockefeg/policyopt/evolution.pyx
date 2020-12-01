@@ -1,8 +1,9 @@
 cimport cython
 
 from rockefeg.cyutil.array cimport DoubleArray
-from rockefeg.cyutil.typed_list cimport new_TypedList
-from rockefeg.cyutil.typed_list cimport is_sub_full_type
+
+from typing import List, Sequence, Generic, TypeVar
+
 
 import random
 import numpy as np
@@ -179,7 +180,7 @@ cdef void init_DefaultPhenotype(
     phenotype.__mutation_factor = 0.
     phenotype.__fitness = 0.
 
-
+T = TypeVar('T', bound = BasePhenotype)
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -191,10 +192,6 @@ cdef class BaseEvolvingSystem(BaseSystem):
         cdef BaseEvolvingSystem new_system
         cdef BasePhenotype phenotype
         cdef Py_ssize_t phenotype_id
-        cdef TypedList phenotypes
-        cdef TypedList new_phenotypes
-        cdef TypedList unevaluated_phenotypes
-        cdef TypedList new_unevaluated_phenotypes
 
         if copy_obj is None:
             new_system = BaseEvolvingSystem.__new__(BaseEvolvingSystem)
@@ -202,20 +199,18 @@ cdef class BaseEvolvingSystem(BaseSystem):
             new_system = copy_obj
 
         # Deep Copy
-        phenotypes = self.__phenotypes
-        new_phenotypes = phenotypes.shallow_copy()
-        for phenotype_id in range(len(phenotypes)):
-            phenotype = phenotypes.item(phenotype_id)
-            new_phenotypes.set_item(phenotype_id, phenotype.copy())
-        new_system.__phenotypes = new_phenotypes
+        new_system.__phenotypes = [None] * len(self.__phenotypes)
+        for phenotype_id in range(len(self.__phenotypes)):
+            phenotype = self.__phenotypes[phenotype_id]
+            new_system.__phenotypes[phenotype_id] = phenotype.copy()
 
         # Deep Copy
-        unevaluated_phenotypes = self.__unevaluated_phenotypes
-        new_unevaluated_phenotypes = unevaluated_phenotypes.shallow_copy()
-        for phenotype_id in range(len(unevaluated_phenotypes)):
-            phenotype = unevaluated_phenotypes.item(phenotype_id)
-            new_unevaluated_phenotypes.set_item(phenotype_id, phenotype.copy())
-        new_system.__unevaluated_phenotypes = new_unevaluated_phenotypes
+        new_system.__unevaluated_phenotypes = (
+            [None] * len(self.__unevaluated_phenotypes) )
+
+        for phenotype_id in range(len(self.__unevaluated_phenotypes)):
+            phenotype = self.__unevaluated_phenotypes.item(phenotype_id)
+            new_system.__unevaluated_phenotypes[phenotype_id] = phenotype.copy()
 
         new_system.__best_phenotypes = None
         new_system.__acting_phenotype = None
@@ -228,15 +223,11 @@ cdef class BaseEvolvingSystem(BaseSystem):
         return self.n_epochs_elapsed() >= self.max_n_epochs()
 
     cpdef void prep_for_epoch(self) except *:
-        cdef BasePhenotype phenotype
         cdef Py_ssize_t n_phenotypes
-        cdef TypedList unevaluated_phenotypes
-        cdef TypedList phenotypes
+        cdef BasePhenotype phenotype
+        cdef Py_ssize_t last_phenotype_id
 
-        phenotypes = self.phenotypes()
-        unevaluated_phenotypes = self._unevaluated_phenotypes()
-        n_phenotypes = len(phenotypes)
-
+        n_phenotypes = len(self.phenotypes())
 
         if n_phenotypes == 0:
             raise (
@@ -254,8 +245,13 @@ cdef class BaseEvolvingSystem(BaseSystem):
         for phenotype in self.phenotypes():
             phenotype.prep_for_epoch()
 
-        unevaluated_phenotypes.set_items(phenotypes.items_shallow_copy())
-        self._set_acting_phenotype(unevaluated_phenotypes.item(-1))
+        self._set_unevaluated_phenotypes(self.phenotypes().copy())
+
+        last_phenotype_id = len(self.unevaluated_phenotypes()) - 1
+        self._set_acting_phenotype(
+            self.unevaluated_phenotypes()[
+                last_phenotype_id ] )
+
         self._set_best_phenotype(self.acting_phenotype())
 
     cpdef bint is_ready_for_evaluation(self) except *:
@@ -267,12 +263,14 @@ cdef class BaseEvolvingSystem(BaseSystem):
     cpdef void receive_feedback(self, feedback) except *:
         self.acting_phenotype().receive_feedback(feedback)
 
+    @cython.locals(unevaluated_phenotypes = list)
     cpdef void update_policy(self) except *:
         cdef BasePhenotype acting_phenotype
         cdef BasePhenotype best_phenotype
         cdef double acting_fitness
         cdef double best_epoch_fitness
-        cdef TypedList unevaluated_phenotypes
+        cdef Py_ssize_t last_phenotype_id
+        unevaluated_phenotypes: List[T]
 
         acting_phenotype = self.acting_phenotype()
         acting_fitness = acting_phenotype.fitness()
@@ -287,9 +285,13 @@ cdef class BaseEvolvingSystem(BaseSystem):
         # Remove current evaluated phenotype.
         unevaluated_phenotypes.pop()
 
-        if len(self.__unevaluated_phenotypes) > 0:
+        if len(unevaluated_phenotypes) > 0:
             # Get new phenotype to evaluate.
-            self._set_acting_phenotype(unevaluated_phenotypes.item(-1))
+            last_phenotype_id = len(unevaluated_phenotypes) - 1
+            self._set_acting_phenotype(
+                unevaluated_phenotypes[
+                    last_phenotype_id ] )
+
         elif self.n_epochs_elapsed() < self.max_n_epochs():
             # The epoch has ended, operate of phenotype population.
             # Set the policy to the best phenotype for evaluation.
@@ -306,32 +308,27 @@ cdef class BaseEvolvingSystem(BaseSystem):
     cpdef void output_final_log(self, log_dirname, datetime_str) except *:
         pass
 
-    cpdef TypedList phenotypes(self):
+    cpdef list phenotypes(self):
+        # type: (...) -> List[T]
         return self.__phenotypes
 
-    cpdef void set_phenotypes(self, TypedList phenotypes) except *:
-
-        cdef object phenotypes_item_type
-
-        phenotypes_item_type = phenotypes.item_type()
-
-        if not is_sub_full_type(phenotypes_item_type, BasePhenotype):
-            raise (
-                TypeError(
-                    "The phenotype list's item type "
-                    "(phenotypes.item_type() = {phenotypes_item_type}) "
-                    "must be a subtype of BasePhenotype."
-                    .format(**locals())))
-
+    @cython.locals(phenotypes = list)
+    cpdef void set_phenotypes(self, phenotypes: List[T]) except *:
         self.__phenotypes = phenotypes
 
-    cpdef BaseReadableTypedList unevaluated_phenotypes(self):
+    cpdef list unevaluated_phenotypes(self):
+        # type: (...) -> Sequence[T]
         return self.__unevaluated_phenotypes
 
-    cpdef TypedList _unevaluated_phenotypes(self):
+    cpdef list _unevaluated_phenotypes(self):
+        # type: (...) -> List[T]
         return self.__unevaluated_phenotypes
 
-    cpdef void _set_unevaluated_phenotypes(self, TypedList phenotypes) except *:
+    @cython.locals(phenotypes = list)
+    cpdef void _set_unevaluated_phenotypes(
+            self,
+            phenotypes: List[T]
+            ) except *:
         self.__unevaluated_phenotypes = phenotypes
 
     cpdef Py_ssize_t max_n_epochs(self) except *:
@@ -400,8 +397,8 @@ cdef void init_BaseEvolvingSystem(BaseEvolvingSystem system) except *:
     if system is None:
         raise TypeError("The system (system) cannot be None.")
 
-    system.__phenotypes = new_TypedList(BasePhenotype)
-    system.__unevaluated_phenotypes = new_TypedList(BasePhenotype)
+    system.__phenotypes = []
+    system.__unevaluated_phenotypes = []
     system.__best_phenotype = None
     system.__acting_phenotype = None
     system.__max_n_epochs = 1
@@ -409,7 +406,7 @@ cdef void init_BaseEvolvingSystem(BaseEvolvingSystem system) except *:
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
-cdef class DefaultEvolvingSystem:
+cdef class DefaultEvolvingSystem(BaseEvolvingSystem):
     def __init__(self):
         init_DefaultEvolvingSystem(self)
 
@@ -425,17 +422,16 @@ cdef class DefaultEvolvingSystem:
 
         return new_system
 
+    @cython.locals(phenotypes = list)
     cpdef void operate(self) except *:
         cdef Py_ssize_t match_id
         cdef DefaultPhenotype contender_a
         cdef DefaultPhenotype contender_b
         cdef double fitness_a
         cdef double fitness_b
-        cdef TypedList phenotypes_typed_list
-        cdef list phenotypes
+        phenotypes: List[DefaultPhenotype]
 
-        phenotypes_typed_list = self.phenotypes()
-        phenotypes = phenotypes_typed_list.items_shallow_copy()
+        phenotypes = self.phenotypes().copy()
 
         # TODO: Optimize random shuffle with non-python random shuffle.
         random.shuffle(phenotypes)
@@ -451,21 +447,13 @@ cdef class DefaultEvolvingSystem:
             else:
                 phenotypes[2 * match_id] = contender_b.child()
 
-        phenotypes_typed_list.set_items(phenotypes)
+        self.set_phenotypes(phenotypes)
 
-    cpdef void set_phenotypes(self, TypedList phenotypes) except *:
-        cdef object phenotypes_item_type
-
-        phenotypes_item_type = phenotypes.item_type()
-
-        if not is_sub_full_type(phenotypes_item_type, DefaultPhenotype):
-            raise (
-                TypeError(
-                    "The phenotype list's item type "
-                    "(phenotypes.item_type() = {phenotypes_item_type}) "
-                    "must be a subtype of DefaultPhenotype."
-                    .format(**locals())))
-
+    @cython.locals(phenotypes = list)
+    cpdef void set_phenotypes(
+            self,
+            phenotypes: List[DefaultPhenotype]
+            ) except *:
         BaseEvolvingSystem.set_phenotypes(self, phenotypes)
 
 @cython.warn.undeclared(True)
@@ -483,8 +471,8 @@ cdef void init_DefaultEvolvingSystem(DefaultEvolvingSystem system) except *:
         raise TypeError("The system (system) cannot be None.")
 
     init_BaseEvolvingSystem(system)
-    system.__phenotypes = new_TypedList(DefaultPhenotype)
-    system.__unevaluated_phenotypes = new_TypedList(DefaultPhenotype)
+    system.__phenotypes = []
+    system.__unevaluated_phenotypes = []
 
 
 
