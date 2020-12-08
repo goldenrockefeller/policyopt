@@ -13,6 +13,7 @@ cdef extern from "<valarray>" namespace "std" nogil:
         valarray operator= (const valarray&)
         T& operator[] (size_t)
         T sum() const
+        T min() const
 
         valarray operator* (const valarray&, const valarray&)
         valarray operator* (const T&, const valarray&)

@@ -86,6 +86,8 @@ cdef void init_TanhLayer(
 
 
 def unpickle_TanhLayer(super_map):
+    cdef object neural_network
+
     neural_network = TanhLayer(super_map)
 
     return neural_network
@@ -672,6 +674,8 @@ cdef void init_ReluLinear(
 
 
 def unpickle_ReluLinear(shape, parameters, leaky_scale, linear1_is_fixed):
+    cdef object neural_network
+
     neural_network = ReluLinear(shape[0], shape[1], shape[2])
     neural_network.linear1_is_fixed = False
     neural_network.set_parameters(parameters)
@@ -1337,6 +1341,8 @@ cdef inline void assign_valarray_to_double(
         arr[id] = val
 
 def unpickle_Rbfn(shape, parameters, scalings_are_fixed, normalizes_activations):
+    cdef object neural_network
+
     neural_network = Rbfn(shape[0], shape[1], shape[2])
     neural_network.scalings_are_fixed = False
     neural_network.set_parameters(parameters)
