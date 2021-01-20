@@ -224,7 +224,7 @@ namespace policyopt {
 
 		size_t n_centers = this->n_centers();
 		for (size_t center_id{ 0 }; center_id < n_centers; center_id++) {
-			const Center& center{ this->centers[center_id] };
+			const Center& center = this->centers[center_id];
 			valarray<double> separation{ center.location - input };
 			double radius_sqr{ (separation * separation * center.shape).sum() };
 			activations[center_id] = exp(-radius_sqr);
@@ -310,7 +310,7 @@ namespace policyopt {
 		n_center_locations_parameters = this->n_in_dims() * n_centers;
 		grad.resize(n_center_locations_parameters);
 		for (size_t center_id{ 0 }; center_id < n_centers; center_id++) {
-			const Center& center{ this->centers[center_id] };
+			const Center& center = this->centers[center_id];
 			slice_length = center.location.size();
 
 			grad[slice(slice_start, slice_length, 1)] 
