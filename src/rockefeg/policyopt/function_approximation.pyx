@@ -111,17 +111,18 @@ cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
         cdef object entries_item_type
         cdef double learning_rate
 
-        entries_item_type = entries.item_type()
-
-        if not is_sub_full_type(entries_item_type, TargetEntry):
-            raise (
-                TypeError(
-                    "The entries list's item type "
-                    "(entries.item_type() = {entries_item_type}) "
-                    "must be a subtype of TargetEntry."
-                    .format(**locals())))
+        # entries_item_type = entries.item_type()
+        #
+        # if not is_sub_full_type(entries_item_type, TargetEntry):
+        #     raise (
+        #         TypeError(
+        #             "The entries list's item type "
+        #             "(entries.item_type() = {entries_item_type}) "
+        #             "must be a subtype of TargetEntry."
+        #             .format(**locals())))
 
         map = self.super_map()
+        # print(type(map.parameters()))
         parameters = map.parameters()
         parameters = parameters.copy()
         n_parameters = map.n_parameters()

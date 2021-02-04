@@ -1,5 +1,3 @@
-# distutils: language = c++
-
 from .map cimport BaseDifferentiableMap
 from rockefeg.cyutil.array cimport DoubleArray
 from libcpp.vector cimport vector

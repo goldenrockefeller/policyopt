@@ -1,4 +1,5 @@
-# distutils: extra_compile_args = -mavx2 -mfma -ftree-vectorize
+# distutils: language = c++
+
 
 cimport cython
 from libc cimport math as cmath

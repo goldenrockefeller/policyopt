@@ -1,3 +1,5 @@
+
+
 cimport cython
 
 from rockefeg.cyutil.array cimport new_DoubleArray
@@ -177,8 +179,15 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
         return new_map
 
-    cpdef parameters(self):
-        return self.super_map().parameters()
+    cpdef object parameters(self):
+        cdef BaseMap super_map
+        # TODO cdef BaseDifferentiableMap super_map should work but doesn't, why?
+        cdef object arr
+
+        super_map = self.super_map()
+
+
+        return  self.super_map().parameters()
 
     cpdef void set_parameters(self, parameters) except *:
         self.super_map().set_parameters(parameters)
@@ -209,7 +218,7 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
             self.super_map().grad_wrt_input(
                 concatenate_observation_action(input), output_grad))
 
-    cpdef BaseDifferentiableMap super_map(self):
+    cpdef BaseMap super_map(self):
         return self.__super_map
 
     cpdef void set_super_map(self, BaseDifferentiableMap super_map) except *:

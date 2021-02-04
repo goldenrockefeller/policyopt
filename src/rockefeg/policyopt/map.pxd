@@ -45,7 +45,7 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
     cpdef DifferentiableCriticMap copy(self, copy_obj = ?)
 
-    cpdef BaseDifferentiableMap super_map(self)
+    cpdef BaseMap super_map(self)
     cpdef void set_super_map(self, BaseDifferentiableMap super_map) except *
 
 cdef DifferentiableCriticMap new_DifferentiableCriticMap(
