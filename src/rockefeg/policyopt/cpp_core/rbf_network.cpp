@@ -33,7 +33,7 @@ namespace policyopt {
 
 		if (n_centers <= 0) {
 			ostringstream msg;
-			msg << "The number of input dimensions (n_centers = "
+			msg << "The number of centers (n_centers = "
 				<< n_centers
 				<< ") must be positive.";
 			throw invalid_argument(msg.str());
@@ -41,7 +41,7 @@ namespace policyopt {
 
 		if (n_out_dims <= 0) {
 			ostringstream msg;
-			msg << "The number of input dimensions (n_out_dims = "
+			msg << "The number of output dimensions (n_out_dims = "
 				<< n_out_dims
 				<< ") must be positive.";
 			throw invalid_argument(msg.str());
