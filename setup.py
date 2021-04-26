@@ -6,10 +6,6 @@ if __name__ == "__main__":
     pkg = "policyopt"
     name = "{namespace}.{pkg}".format(**locals())
 
-
-    if len(sys.argv) == 1:
-        sys.argv.append("develop")
-
     setup(
         name = name,
         version='0.0.0',
