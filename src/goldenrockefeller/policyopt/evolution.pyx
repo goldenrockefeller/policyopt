@@ -1,6 +1,6 @@
 cimport cython
 
-from rockefeg.cyutil.array cimport DoubleArray
+from goldenrockefeller.cyutil.array cimport DoubleArray
 
 from typing import List, Sequence, Generic, TypeVar
 

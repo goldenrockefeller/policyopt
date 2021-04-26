@@ -2,7 +2,7 @@
 
 cimport cython
 
-from rockefeg.cyutil.array cimport new_DoubleArray
+from goldenrockefeller.cyutil.array cimport new_DoubleArray
 from .experience cimport ExperienceDatum
 
 @cython.warn.undeclared(True)

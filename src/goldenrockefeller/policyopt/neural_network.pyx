@@ -3,7 +3,7 @@
 
 cimport cython
 from libc cimport math as cmath
-from rockefeg.cyutil.array cimport DoubleArray, new_DoubleArray
+from goldenrockefeller.cyutil.array cimport DoubleArray, new_DoubleArray
 from .map cimport default_jacobian_wrt_parameters, default_jacobian_wrt_input
 from libc.math cimport tanh
 

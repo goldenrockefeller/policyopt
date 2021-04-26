@@ -1,4 +1,4 @@
-from rockefeg.cyutil.array cimport DoubleArray
+from goldenrockefeller.cyutil.array cimport DoubleArray
 
 cdef class BaseMap:
     cpdef BaseMap copy(self, copy_obj = ?)

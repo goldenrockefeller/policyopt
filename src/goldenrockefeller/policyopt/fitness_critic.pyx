@@ -5,7 +5,7 @@ import cython
 from .buffer cimport new_ShuffleBuffer
 from .experience cimport ExperienceDatum, new_ExperienceDatum
 from .function_approximation cimport TargetEntry
-from rockefeg.cyutil.array cimport DoubleArray
+from goldenrockefeller.cyutil.array cimport DoubleArray
 
 from libc.math cimport isfinite
 

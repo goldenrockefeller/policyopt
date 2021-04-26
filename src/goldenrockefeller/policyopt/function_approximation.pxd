@@ -1,5 +1,5 @@
 from .map cimport BaseMap, BaseDifferentiableMap
-from rockefeg.cyutil.array cimport DoubleArray
+from goldenrockefeller.cyutil.array cimport DoubleArray
 
 import cython
 from typing import Sequence

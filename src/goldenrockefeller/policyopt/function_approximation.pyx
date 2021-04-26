@@ -1,6 +1,6 @@
 cimport cython
-from rockefeg.cyutil.array cimport new_DoubleArray
-from rockefeg.cyutil.typed_list cimport is_sub_full_type
+from goldenrockefeller.cyutil.array cimport new_DoubleArray
+from goldenrockefeller.cyutil.typed_list cimport is_sub_full_type
 # import numpy as np
 # from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 # from numpy.random cimport bitgen_t

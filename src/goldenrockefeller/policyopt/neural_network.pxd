@@ -1,5 +1,5 @@
 from .map cimport BaseDifferentiableMap
-from rockefeg.cyutil.array cimport DoubleArray
+from goldenrockefeller.cyutil.array cimport DoubleArray
 from libcpp.vector cimport vector
 
 cdef extern from "<valarray>" namespace "std" nogil:
