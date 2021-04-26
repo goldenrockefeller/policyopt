@@ -21,7 +21,7 @@ cdef class BasePhenotype:
         else:
             new_phenotype = copy_obj
 
-        new_phenotype.__policy = self.__policy.copy()
+        new_phenotype._policy = self._policy.copy()
 
         return new_phenotype
 
