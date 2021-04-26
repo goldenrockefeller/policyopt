@@ -1,7 +1,7 @@
 cimport cython
 import cython
 
-from .value_target cimport new_TotalRewardTargetSetter
+# from .value_target cimport new_TotalRewardTargetSetter
 from .buffer cimport new_ShuffleBuffer
 from .experience cimport ExperienceDatum, new_ExperienceDatum
 from .function_approximation cimport TargetEntry
@@ -52,7 +52,7 @@ cdef class FitnessCriticSystem(BaseSystem):
         new_system._redistributes_critic_target_updates = (
             self._redistributes_critic_target_updates)
 
-        new_system._value_target_setter = self._value_target_setter.copy()
+        # new_system._value_target_setter = self._value_target_setter.copy()
 
         return new_system
 
@@ -69,7 +69,7 @@ cdef class FitnessCriticSystem(BaseSystem):
         cdef Py_ssize_t batch_size
         cdef ShuffleBuffer trajectory_buffer
         cdef ShuffleBuffer critic_target_buffer
-        cdef BaseValueTargetSetter value_target_setter
+        # cdef BaseValueTargetSetter value_target_setter
         trajectory: List[ExperienceDatum]
         target_entries: List[TargetEntry]
         cdef TargetEntry target_entry
@@ -87,30 +87,31 @@ cdef class FitnessCriticSystem(BaseSystem):
         batch_size = self.critic_update_batch_size()
         intermediate_critic = self.intermediate_critic()
 
-        value_target_setter = self.value_target_setter()
+        # value_target_setter = self.value_target_setter()
+        raise NotImplementedError("This function needs a redo")
 
-        if not trajectory_buffer.is_empty():
-            for batch_id in range(n_batches):
-                for trajectory_id in range(n_trajectories_per_batch):
-                    trajectory = trajectory_buffer.next_shuffled_datum()
-                    target_entries = (
-                        value_target_setter.value_target_entries(
-                            trajectory))
-                    for target_entry in target_entries:
-                        critic_target_buffer.add_staged_datum(target_entry)
-
-
-                target_entries = [None] * batch_size
-
-                for target_id in range(batch_size):
-                    target_entry = critic_target_buffer.next_shuffled_datum()
-                    target_entries[target_id] = target_entry
-
-                intermediate_critic.batch_update(target_entries)
-            raise NotImplementedError("This function needs a redo")
-            print(intermediate_critic.eval(trajectory[0]).view[0])
-
-        self.super_system().prep_for_epoch()
+        # if not trajectory_buffer.is_empty():
+        #     for batch_id in range(n_batches):
+        #         for trajectory_id in range(n_trajectories_per_batch):
+        #             trajectory = trajectory_buffer.next_shuffled_datum()
+        #             target_entries = (
+        #                 value_target_setter.value_target_entries(
+        #                     trajectory))
+        #             for target_entry in target_entries:
+        #                 critic_target_buffer.add_staged_datum(target_entry)
+        #
+        #
+        #         target_entries = [None] * batch_size
+        #
+        #         for target_id in range(batch_size):
+        #             target_entry = critic_target_buffer.next_shuffled_datum()
+        #             target_entries[target_id] = target_entry
+        #
+        #         intermediate_critic.batch_update(target_entries)
+        #     raise NotImplementedError("This function needs a redo")
+        #     print(intermediate_critic.eval(trajectory[0]).view[0])
+        #
+        # self.super_system().prep_for_epoch()
 
     cpdef bint is_ready_for_evaluation(self) except *:
         cdef BaseSystem system
@@ -201,14 +202,14 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *:
         self._critic_target_buffer = buffer
 
-    cpdef BaseValueTargetSetter value_target_setter(self):
-        return self._value_target_setter
-
-    cpdef void set_value_target_setter(
-            self,
-            BaseValueTargetSetter value_target_setter
-            ) except *:
-        self._value_target_setter = value_target_setter
+    # cpdef BaseValueTargetSetter value_target_setter(self):
+    #     return self._value_target_setter
+    #
+    # cpdef void set_value_target_setter(
+    #         self,
+    #         BaseValueTargetSetter value_target_setter
+    #         ) except *:
+    #     self._value_target_setter = value_target_setter
 
     cpdef current_observation(self):
         return self._current_observation
@@ -312,5 +313,5 @@ cdef void init_FitnessCriticSystem(
     system._n_trajectories_per_critic_update_batch = 1
     system._n_critic_update_batches_per_epoch = 1
     system._redistributes_critic_target_updates = False
-    system._value_target_setter = new_TotalRewardTargetSetter()
+    # system._value_target_setter = new_TotalRewardTargetSetter()
 

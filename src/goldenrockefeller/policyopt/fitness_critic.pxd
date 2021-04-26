@@ -1,7 +1,7 @@
 from .system cimport BaseSystem
 from .function_approximation cimport BaseFunctionApproximator
 from .buffer cimport ShuffleBuffer
-from .value_target cimport BaseValueTargetSetter
+# from .value_target cimport BaseValueTargetSetter
 
 import cython
 from typing import List, Sequence
@@ -11,7 +11,7 @@ cdef class FitnessCriticSystem(BaseSystem):
     cdef BaseFunctionApproximator _intermediate_critic
     cdef ShuffleBuffer _trajectory_buffer
     cdef ShuffleBuffer _critic_target_buffer
-    cdef BaseValueTargetSetter _value_target_setter
+    # cdef BaseValueTargetSetter _value_target_setter
     cdef _current_observation
     cdef _current_action
     cdef list _current_trajectory
@@ -37,8 +37,8 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef ShuffleBuffer critic_target_buffer(self)
     cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *
 
-    cpdef BaseValueTargetSetter value_target_setter(self)
-    cpdef void set_value_target_setter(self, BaseValueTargetSetter value_target_setter) except *
+    # cpdef BaseValueTargetSetter value_target_setter(self)
+    # cpdef void set_value_target_setter(self, BaseValueTargetSetter value_target_setter) except *
 
     cpdef current_observation(self)
     cpdef void _set_current_observation(self, observation) except *
