@@ -21,7 +21,6 @@ cdef class ShuffleBuffer() :
     cpdef Py_ssize_t capacity(self) except *
     cpdef void set_capacity(self, Py_ssize_t capacity) except *
 
-    cpdef Py_ssize_t _buffer_pos(self) except *
     cpdef void _set_buffer_pos(self, Py_ssize_t buffer_pos) except *
 
 

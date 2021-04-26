@@ -49,7 +49,7 @@ cdef class ShuffleBuffer():
             staged_data.append(datum)
         else:
             # Replace at buffer position and move the buffer position.
-            buffer_pos = self._buffer_pos()
+            buffer_pos = self._buffer_pos
             staged_data[buffer_pos] =  datum
             buffer_pos += 1
             if buffer_pos == self.capacity():
@@ -106,7 +106,7 @@ cdef class ShuffleBuffer():
         if capacity < self._capacity:
             new_staged_data = [None] * capacity
 
-            buffer_pos = self._buffer_pos()
+            buffer_pos = self._buffer_pos
             buffer_pos += self._capacity - capacity
             if buffer_pos > self._capacity:
                 buffer_pos -= self._capacity
@@ -122,8 +122,7 @@ cdef class ShuffleBuffer():
 
         self._capacity = capacity
 
-    cpdef Py_ssize_t _buffer_pos(self) except *:
-        return self._buffer_pos
+
 
     cpdef void _set_buffer_pos(self, Py_ssize_t buffer_pos) except *:
         cdef Py_ssize_t n_staged_data_points
@@ -155,7 +154,7 @@ cdef class ShuffleBuffer():
     cpdef void _set_staged_data(self, staged_data: List[T]) except *:
         self._staged_data = staged_data
 
-    cpdef list _shuffled_data(self):
+    cpdef list shuffled_data(self):
         # type: (...) -> list[T]
         return self._shuffled_data
 
