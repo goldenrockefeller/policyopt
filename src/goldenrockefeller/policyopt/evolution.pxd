@@ -7,7 +7,7 @@ from typing import List, Seqeunce, Generic
 
 
 cdef class BasePhenotype:
-    cdef BaseMap __policy
+    cdef BaseMap _policy
 
     cpdef BasePhenotype copy(self, copy_obj = ?)
 
@@ -34,9 +34,9 @@ cdef void init_BasePhenotype(
     ) except *
 
 cdef class DefaultPhenotype(BasePhenotype):
-    cdef double __mutation_rate
-    cdef double __mutation_factor
-    cdef double __fitness
+    cdef double _mutation_rate
+    cdef double _mutation_factor
+    cdef double _fitness
 
     cpdef DefaultPhenotype copy(self, copy_obj = ?)
 
@@ -56,12 +56,12 @@ cdef void init_DefaultPhenotype(
 
 # T must be a BasePhenotype
 cdef class BaseEvolvingSystem(BaseSystem):
-    cdef list __phenotypes
-    cdef list __unevaluated_phenotypes
-    cdef BasePhenotype __best_phenotype
-    cdef BasePhenotype __acting_phenotype
-    cdef Py_ssize_t __max_n_epochs
-    cdef Py_ssize_t __n_epochs_elapsed
+    cdef list _phenotypes
+    cdef list _unevaluated_phenotypes
+    cdef BasePhenotype _best_phenotype
+    cdef BasePhenotype _acting_phenotype
+    cdef Py_ssize_t _max_n_epochs
+    cdef Py_ssize_t _n_epochs_elapsed
 
     cpdef BaseEvolvingSystem copy(self, copy_obj = ?)
 
@@ -75,9 +75,6 @@ cdef class BaseEvolvingSystem(BaseSystem):
 
     cpdef list unevaluated_phenotypes(self)
     # type: (...) -> Sequence[T]
-
-    cpdef list _unevaluated_phenotypes(self)
-    # type: (...) -> List[T]
 
     @cython.locals(phenotypes = list)
     cpdef void _set_unevaluated_phenotypes(

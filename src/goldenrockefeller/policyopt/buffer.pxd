@@ -3,10 +3,10 @@ from typing import List
 
 
 cdef class ShuffleBuffer() :
-    cdef list __shuffled_data
-    cdef list __staged_data
-    cdef Py_ssize_t __capacity
-    cdef Py_ssize_t __buffer_pos
+    cdef list _shuffled_data
+    cdef list _staged_data
+    cdef Py_ssize_t _capacity
+    cdef Py_ssize_t _buffer_pos
 
     cpdef ShuffleBuffer copy(self, copy_obj = ?)
 
@@ -28,18 +28,12 @@ cdef class ShuffleBuffer() :
     cpdef list staged_data(self)
     # type: (...) -> Sequence[T]
 
-    cpdef list _staged_data(self)
-    # type: (...) -> List[T]
-
     @cython.locals(staged_data = list)
     cpdef void _set_staged_data(self, staged_data: List[T]) except *
 
 
     cpdef list shuffled_data(self)
     # type: (...) -> Sequence[T]
-
-    cpdef list _shuffled_data(self)
-    # type: (...) -> List[T]
 
     @cython.locals(shuffled_data = list)
     cpdef void _set_shuffled_data(self, shuffled_data: List[T])  except *

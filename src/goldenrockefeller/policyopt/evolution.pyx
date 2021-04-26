@@ -47,10 +47,10 @@ cdef class BasePhenotype:
         raise NotImplementedError("Abstract method.")
 
     cpdef BaseMap policy(self):
-        return self.__policy
+        return self._policy
 
     cpdef void set_policy(self, BaseMap policy) except *:
-        self.__policy = policy
+        self._policy = policy
 
 @cython.warn.undeclared(True)
 cdef void init_BasePhenotype(
@@ -63,7 +63,7 @@ cdef void init_BasePhenotype(
     if policy is None:
         raise TypeError("The policy (policy) cannot be None.")
 
-    phenotype.__policy = policy
+    phenotype._policy = policy
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -80,9 +80,9 @@ cdef class DefaultPhenotype(BasePhenotype):
             new_phenotype = copy_obj
 
         new_phenotype = BasePhenotype.copy(self, new_phenotype)
-        new_phenotype.__mutation_rate = self.__mutation_rate
-        new_phenotype.__mutation_factor = self.__mutation_factor
-        new_phenotype.__fitness = 0.
+        new_phenotype._mutation_rate = self._mutation_rate
+        new_phenotype._mutation_factor = self._mutation_factor
+        new_phenotype._fitness = 0.
 
         return new_phenotype
 
@@ -125,16 +125,16 @@ cdef class DefaultPhenotype(BasePhenotype):
         self.set_fitness(self.fitness() + feedback_as_double)
 
     cpdef double fitness(self) except *:
-        return self.__fitness
+        return self._fitness
 
     cpdef void prep_for_epoch(self) except *:
         self.set_fitness(0.)
 
     cpdef void set_fitness(self, double fitness) except *:
-        self.__fitness = fitness
+        self._fitness = fitness
 
     cpdef double mutation_rate(self) except *:
-        return self.__mutation_rate
+        return self._mutation_rate
 
     cpdef void set_mutation_rate(self, double mutation_rate) except *:
         if mutation_rate < 0. or mutation_rate > 1.:
@@ -144,10 +144,10 @@ cdef class DefaultPhenotype(BasePhenotype):
                     "be in the range [0., 1.]"
                     .format(**locals())))
 
-        self.__mutation_rate = mutation_rate
+        self._mutation_rate = mutation_rate
 
     cpdef double mutation_factor(self) except *:
-        return self.__mutation_factor
+        return self._mutation_factor
 
     cpdef void set_mutation_factor(self, double mutation_factor) except *:
         if mutation_factor < 0.:
@@ -156,7 +156,7 @@ cdef class DefaultPhenotype(BasePhenotype):
                     "The mutation rate (mutation_factor = {mutation_factor}) "
                     "must be non-negative."
                     .format(**locals())))
-        self.__mutation_factor = mutation_factor
+        self._mutation_factor = mutation_factor
 
 @cython.warn.undeclared(True)
 cdef DefaultPhenotype new_DefaultPhenotype(BaseMap policy):
@@ -176,9 +176,9 @@ cdef void init_DefaultPhenotype(
         raise TypeError("The INSERT_phenotype (phenotype) cannot be None.")
 
     init_BasePhenotype(phenotype, policy)
-    phenotype.__mutation_rate = 0.
-    phenotype.__mutation_factor = 0.
-    phenotype.__fitness = 0.
+    phenotype._mutation_rate = 0.
+    phenotype._mutation_factor = 0.
+    phenotype._fitness = 0.
 
 T = TypeVar('T', bound = BasePhenotype)
 
@@ -199,23 +199,23 @@ cdef class BaseEvolvingSystem(BaseSystem):
             new_system = copy_obj
 
         # Deep Copy
-        new_system.__phenotypes = [None] * len(self.__phenotypes)
-        for phenotype_id in range(len(self.__phenotypes)):
-            phenotype = self.__phenotypes[phenotype_id]
-            new_system.__phenotypes[phenotype_id] = phenotype.copy()
+        new_system._phenotypes = [None] * len(self._phenotypes)
+        for phenotype_id in range(len(self._phenotypes)):
+            phenotype = self._phenotypes[phenotype_id]
+            new_system._phenotypes[phenotype_id] = phenotype.copy()
 
         # Deep Copy
-        new_system.__unevaluated_phenotypes = (
-            [None] * len(self.__unevaluated_phenotypes) )
+        new_system._unevaluated_phenotypes = (
+            [None] * len(self._unevaluated_phenotypes) )
 
-        for phenotype_id in range(len(self.__unevaluated_phenotypes)):
-            phenotype = self.__unevaluated_phenotypes.item(phenotype_id)
-            new_system.__unevaluated_phenotypes[phenotype_id] = phenotype.copy()
+        for phenotype_id in range(len(self._unevaluated_phenotypes)):
+            phenotype = self._unevaluated_phenotypes.item(phenotype_id)
+            new_system._unevaluated_phenotypes[phenotype_id] = phenotype.copy()
 
-        new_system.__best_phenotypes = None
-        new_system.__acting_phenotype = None
-        new_system.__max_n_epochs = self.__max_n_epochs
-        new_system.__n_epochs_elapsed = self.__n_epochs_elapsed
+        new_system._best_phenotypes = None
+        new_system._acting_phenotype = None
+        new_system._max_n_epochs = self._max_n_epochs
+        new_system._n_epochs_elapsed = self._n_epochs_elapsed
 
         return new_system
 
@@ -276,7 +276,7 @@ cdef class BaseEvolvingSystem(BaseSystem):
         acting_fitness = acting_phenotype.fitness()
         best_phenotype = self.best_phenotype()
         best_epoch_fitness = best_phenotype.fitness()
-        unevaluated_phenotypes = self._unevaluated_phenotypes()
+        unevaluated_phenotypes = self._unevaluated_phenotypes
 
         # Update the best phenotype.
         if acting_fitness > best_epoch_fitness:
@@ -310,29 +310,26 @@ cdef class BaseEvolvingSystem(BaseSystem):
 
     cpdef list phenotypes(self):
         # type: (...) -> List[T]
-        return self.__phenotypes
+        return self._phenotypes
 
     @cython.locals(phenotypes = list)
     cpdef void set_phenotypes(self, phenotypes: List[T]) except *:
-        self.__phenotypes = phenotypes
+        self._phenotypes = phenotypes
 
     cpdef list unevaluated_phenotypes(self):
         # type: (...) -> Sequence[T]
-        return self.__unevaluated_phenotypes
+        return self._unevaluated_phenotypes
 
-    cpdef list _unevaluated_phenotypes(self):
-        # type: (...) -> List[T]
-        return self.__unevaluated_phenotypes
 
     @cython.locals(phenotypes = list)
     cpdef void _set_unevaluated_phenotypes(
             self,
             phenotypes: List[T]
             ) except *:
-        self.__unevaluated_phenotypes = phenotypes
+        self._unevaluated_phenotypes = phenotypes
 
     cpdef Py_ssize_t max_n_epochs(self) except *:
-        return self.__max_n_epochs
+        return self._max_n_epochs
 
     cpdef void set_max_n_epochs(self, Py_ssize_t max_n_epochs) except*:
         cdef Py_ssize_t n_epochs_elapsed
@@ -355,11 +352,11 @@ cdef class BaseEvolvingSystem(BaseSystem):
                     "{max_n_epochs}) must be positive."
                     .format(**locals())))
 
-        self.__max_n_epochs = max_n_epochs
+        self._max_n_epochs = max_n_epochs
 
 
     cpdef Py_ssize_t n_epochs_elapsed(self) except *:
-        return self.__n_epochs_elapsed
+        return self._n_epochs_elapsed
 
     cpdef void _set_n_epochs_elapsed(self, Py_ssize_t n_epochs_elapsed) except*:
         if n_epochs_elapsed < 0:
@@ -369,19 +366,19 @@ cdef class BaseEvolvingSystem(BaseSystem):
                     "{n_epochs_elapsed}) must be non-negative."
                     .format(**locals())))
 
-        self.__n_epochs_elapsed = n_epochs_elapsed
+        self._n_epochs_elapsed = n_epochs_elapsed
 
     cpdef BasePhenotype best_phenotype(self):
-        return self.__best_phenotype
+        return self._best_phenotype
 
     cpdef void _set_best_phenotype(self, BasePhenotype phenotype) except *:
-        self.__best_phenotype = phenotype
+        self._best_phenotype = phenotype
 
     cpdef BasePhenotype acting_phenotype(self):
-        return  self.__acting_phenotype
+        return  self._acting_phenotype
 
     cpdef void _set_acting_phenotype(self, BasePhenotype phenotype) except *:
-        self.__acting_phenotype = phenotype
+        self._acting_phenotype = phenotype
 
 @cython.warn.undeclared(True)
 cdef BaseEvolvingSystem new_BaseEvolvingSystem():
@@ -397,12 +394,12 @@ cdef void init_BaseEvolvingSystem(BaseEvolvingSystem system) except *:
     if system is None:
         raise TypeError("The system (system) cannot be None.")
 
-    system.__phenotypes = []
-    system.__unevaluated_phenotypes = []
-    system.__best_phenotype = None
-    system.__acting_phenotype = None
-    system.__max_n_epochs = 1
-    system.__n_epochs_elapsed = 0
+    system._phenotypes = []
+    system._unevaluated_phenotypes = []
+    system._best_phenotype = None
+    system._acting_phenotype = None
+    system._max_n_epochs = 1
+    system._n_epochs_elapsed = 0
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -471,8 +468,8 @@ cdef void init_DefaultEvolvingSystem(DefaultEvolvingSystem system) except *:
         raise TypeError("The system (system) cannot be None.")
 
     init_BaseEvolvingSystem(system)
-    system.__phenotypes = []
-    system.__unevaluated_phenotypes = []
+    system._phenotypes = []
+    system._unevaluated_phenotypes = []
 
 
 

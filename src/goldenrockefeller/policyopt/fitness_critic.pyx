@@ -26,33 +26,33 @@ cdef class FitnessCriticSystem(BaseSystem):
         else:
             new_system = copy_obj
 
-        new_system.__super_system = self.__super_system.copy()
-        new_system.__intermediate_critic = self.__intermediate_critic.copy()
-        new_system.__trajectory_buffer = self.__trajectory_buffer.copy()
-        new_system.__critic_target_buffer = self.__critic_target_buffer.copy()
+        new_system._super_system = self._super_system.copy()
+        new_system._intermediate_critic = self._intermediate_critic.copy()
+        new_system._trajectory_buffer = self._trajectory_buffer.copy()
+        new_system._critic_target_buffer = self._critic_target_buffer.copy()
 
         # Shallow copy observation and action.
-        new_system.__current_observation = self.__current_observation
-        new_system.__current_action = self.__current_action
+        new_system._current_observation = self._current_observation
+        new_system._current_action = self._current_action
 
 
-        new_system.__current_trajectory = (
-            self.__current_trajectory.shallow_copy() )
+        new_system._current_trajectory = (
+            self._current_trajectory.shallow_copy() )
 
 
-        new_system.__n_trajectories_per_critic_update_batch = (
-            self.__n_trajectories_per_critic_update_batch)
+        new_system._n_trajectories_per_critic_update_batch = (
+            self._n_trajectories_per_critic_update_batch)
 
-        new_system.__critic_update_batch_size = (
-            self.__critic_update_batch_size)
+        new_system._critic_update_batch_size = (
+            self._critic_update_batch_size)
 
-        new_system.__n_critic_update_batches_per_epoch = (
-            self.__n_critic_update_batches_per_epoch)
+        new_system._n_critic_update_batches_per_epoch = (
+            self._n_critic_update_batches_per_epoch)
 
-        new_system.__redistributes_critic_target_updates = (
-            self.__redistributes_critic_target_updates)
+        new_system._redistributes_critic_target_updates = (
+            self._redistributes_critic_target_updates)
 
-        new_system.__value_target_setter = self.__value_target_setter.copy()
+        new_system._value_target_setter = self._value_target_setter.copy()
 
         return new_system
 
@@ -168,22 +168,22 @@ cdef class FitnessCriticSystem(BaseSystem):
         self.super_system().output_final_log(log_dirname, datetime_str)
 
     cpdef BaseSystem super_system(self):
-        return self.__super_system
+        return self._super_system
 
     cpdef void set_super_system(self, BaseSystem super_system) except *:
-        self.__super_system = super_system
+        self._super_system = super_system
 
     cpdef BaseFunctionApproximator intermediate_critic(self):
-        return self.__intermediate_critic
+        return self._intermediate_critic
 
     cpdef void set_intermediate_critic(
             self,
             BaseFunctionApproximator intermediate_critic
             ) except *:
-        self.__intermediate_critic = intermediate_critic
+        self._intermediate_critic = intermediate_critic
 
     cpdef ShuffleBuffer trajectory_buffer(self):
-        return self.__trajectory_buffer
+        return self._trajectory_buffer
 
     cpdef void _set_trajectory_buffer(self, ShuffleBuffer buffer) except *:
 
@@ -193,84 +193,81 @@ cdef class FitnessCriticSystem(BaseSystem):
 
 
 
-        self.__trajectory_buffer = buffer
+        self._trajectory_buffer = buffer
 
     cpdef ShuffleBuffer critic_target_buffer(self):
-        return self.__critic_target_buffer
+        return self._critic_target_buffer
 
     cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *:
-        self.__critic_target_buffer = buffer
+        self._critic_target_buffer = buffer
 
     cpdef BaseValueTargetSetter value_target_setter(self):
-        return self.__value_target_setter
+        return self._value_target_setter
 
     cpdef void set_value_target_setter(
             self,
             BaseValueTargetSetter value_target_setter
             ) except *:
-        self.__value_target_setter = value_target_setter
+        self._value_target_setter = value_target_setter
 
     cpdef current_observation(self):
-        return self.__current_observation
+        return self._current_observation
 
     cpdef void _set_current_observation(self, observation) except *:
-        self.__current_observation = observation
+        self._current_observation = observation
 
     cpdef current_action(self):
-         return self.__current_action
+         return self._current_action
 
     cpdef void _set_current_action(self, action) except *:
-            self.__current_action = action
+            self._current_action = action
 
     cpdef list current_trajectory(self):
         # type: (...) -> Sequence[ExperienceDatum]
-        return self.__current_trajectory
+        return self._current_trajectory
 
-    cpdef list _current_trajectory(self):
-        # type: (...) -> List[ExperienceDatum]
-        return self.__current_trajectory
 
     @cython.locals(trajectory = list)
     cpdef void _set_current_trajectory(
             self,
             trajectory: List[ExperienceDatum]
             ) except *:
-        self.__current_trajectory = trajectory
+        self._current_trajectory = trajectory
 
     cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *:
-        return self.__n_trajectories_per_critic_update_batch
+        return self._n_trajectories_per_critic_update_batch
 
     cpdef void set_n_trajectories_per_critic_update_batch(
             self,
             Py_ssize_t n_trajectories
             ) except *:
-        self.__n_trajectories_per_critic_update_batch =  n_trajectories
+        self._n_trajectories_per_critic_update_batch =  n_trajectories
 
 
     cpdef Py_ssize_t critic_update_batch_size(self) except *:
-        return self.__critic_update_batch_size
+        return self._critic_update_batch_size
 
     cpdef void set_critic_update_batch_size(self, Py_ssize_t size) except *:
-        self.__critic_update_batch_size = size
+        self._critic_update_batch_size = size
 
     cpdef Py_ssize_t n_critic_update_batches_per_epoch(self) except *:
-        return self.__n_critic_update_batches_per_epoch
+        return self._n_critic_update_batches_per_epoch
 
     cpdef void set_n_critic_update_batches_per_epoch(
             self,
             Py_ssize_t n_batches
             ) except *:
-        self.__n_critic_update_batches_per_epoch = n_batches
+        self._n_critic_update_batches_per_epoch = n_batches
 
     cpdef bint redistributes_critic_target_updates(self) except *:
         # Todo: implement this
-        return self.__redistributes_critic_target_updates
+        return self._redistributes_critic_target_updates
 
     cpdef void set_redistributes_critic_target_updates(
             self,
             bint redistributes_updates
             ) except *:
-        self.__redistributes_critic_target_updates = redistributes_updates
+        self._redistributes_critic_target_updates = redistributes_updates
 
 
 
@@ -304,16 +301,16 @@ cdef void init_FitnessCriticSystem(
                 "The intermediate critic (intermediate_critic) cannot be "
                 "None." ))
 
-    system.__super_system = super_system
-    system.__intermediate_critic = intermediate_critic
-    system.__trajectory_buffer = new_ShuffleBuffer()
-    system.__critic_target_buffer = new_ShuffleBuffer()
-    system.__current_observation = None
-    system.__current_action = None
-    system.__current_trajectory = []
-    system.__critic_update_batch_size = 1
-    system.__n_trajectories_per_critic_update_batch = 1
-    system.__n_critic_update_batches_per_epoch = 1
-    system.__redistributes_critic_target_updates = False
-    system.__value_target_setter = new_TotalRewardTargetSetter()
+    system._super_system = super_system
+    system._intermediate_critic = intermediate_critic
+    system._trajectory_buffer = new_ShuffleBuffer()
+    system._critic_target_buffer = new_ShuffleBuffer()
+    system._current_observation = None
+    system._current_action = None
+    system._current_trajectory = []
+    system._critic_update_batch_size = 1
+    system._n_trajectories_per_critic_update_batch = 1
+    system._n_critic_update_batches_per_epoch = 1
+    system._redistributes_critic_target_updates = False
+    system._value_target_setter = new_TotalRewardTargetSetter()
 

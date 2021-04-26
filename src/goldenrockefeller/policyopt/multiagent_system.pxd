@@ -6,8 +6,8 @@ from typing import Sequence
 
 
 cdef class MultiagentSystem(BaseSystem):
-    cdef list __agent_systems
-    # list<BaseSystem>[n_agents] __agent_systems
+    cdef list _agent_systems
+    # list<BaseSystem>[n_agents] _agent_systems
 
     cpdef MultiagentSystem copy(self, copy_obj = ?)
 

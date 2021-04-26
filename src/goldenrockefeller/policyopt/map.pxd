@@ -27,7 +27,7 @@ cpdef list default_jacobian_wrt_input(
     DoubleArray input)
 
 cdef class ContinuousCriticMap(BaseMap):
-    cdef BaseMap __super_map
+    cdef BaseMap _super_map
 
     cpdef ContinuousCriticMap copy(self, copy_obj = ?)
 
@@ -41,7 +41,7 @@ cdef void init_ContinuousCriticMap(
     ) except *
 
 cdef class DifferentiableCriticMap(BaseDifferentiableMap):
-    cdef BaseDifferentiableMap __super_map
+    cdef BaseDifferentiableMap _super_map
 
     cpdef DifferentiableCriticMap copy(self, copy_obj = ?)
 

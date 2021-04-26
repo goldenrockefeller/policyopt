@@ -114,7 +114,7 @@ cdef class ContinuousCriticMap(BaseMap):
 
         BaseMap.copy(self, new_map)
 
-        new_map.__super_map = self.__super_map.copy()
+        new_map._super_map = self._super_map.copy()
 
         return new_map
 
@@ -132,10 +132,10 @@ cdef class ContinuousCriticMap(BaseMap):
         return self.super_map().eval(concatenate_observation_action(input) )
 
     cpdef BaseMap super_map(self):
-        return self.__super_map
+        return self._super_map
 
     cpdef void set_super_map(self, BaseMap super_map) except *:
-        self.__super_map = super_map
+        self._super_map = super_map
 
 @cython.warn.undeclared(True)
 cdef ContinuousCriticMap new_ContinuousCriticMap(BaseMap super_map):
@@ -157,7 +157,7 @@ cdef void init_ContinuousCriticMap(
     if super_map is None:
         raise TypeError("The map (super_map) cannot be None.")
 
-    map.__super_map = super_map
+    map._super_map = super_map
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -175,7 +175,7 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
 
         BaseDifferentiableMap.copy(self, new_map)
 
-        new_map.__super_map = self.__super_map.copy()
+        new_map._super_map = self._super_map.copy()
 
         return new_map
 
@@ -219,10 +219,10 @@ cdef class DifferentiableCriticMap(BaseDifferentiableMap):
                 concatenate_observation_action(input), output_grad))
 
     cpdef BaseMap super_map(self):
-        return self.__super_map
+        return self._super_map
 
     cpdef void set_super_map(self, BaseDifferentiableMap super_map) except *:
-        self.__super_map = super_map
+        self._super_map = super_map
 
 @cython.warn.undeclared(True)
 cdef DifferentiableCriticMap new_DifferentiableCriticMap(
@@ -245,7 +245,7 @@ cdef void init_DifferentiableCriticMap(
     if super_map is None:
         raise TypeError("The map (super_map) cannot be None.")
 
-    map.__super_map = super_map
+    map._super_map = super_map
 
 
 cpdef DoubleArray concatenate_observation_action(input):

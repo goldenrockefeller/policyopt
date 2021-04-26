@@ -7,18 +7,18 @@ import cython
 from typing import List, Sequence
 
 cdef class FitnessCriticSystem(BaseSystem):
-    cdef BaseSystem __super_system
-    cdef BaseFunctionApproximator __intermediate_critic
-    cdef ShuffleBuffer __trajectory_buffer
-    cdef ShuffleBuffer __critic_target_buffer
-    cdef BaseValueTargetSetter __value_target_setter
-    cdef __current_observation
-    cdef __current_action
-    cdef list __current_trajectory
-    cdef Py_ssize_t __n_trajectories_per_critic_update_batch
-    cdef Py_ssize_t __critic_update_batch_size
-    cdef Py_ssize_t __n_critic_update_batches_per_epoch
-    cdef bint __redistributes_critic_target_updates
+    cdef BaseSystem _super_system
+    cdef BaseFunctionApproximator _intermediate_critic
+    cdef ShuffleBuffer _trajectory_buffer
+    cdef ShuffleBuffer _critic_target_buffer
+    cdef BaseValueTargetSetter _value_target_setter
+    cdef _current_observation
+    cdef _current_action
+    cdef list _current_trajectory
+    cdef Py_ssize_t _n_trajectories_per_critic_update_batch
+    cdef Py_ssize_t _critic_update_batch_size
+    cdef Py_ssize_t _n_critic_update_batches_per_epoch
+    cdef bint _redistributes_critic_target_updates
 
     cpdef FitnessCriticSystem copy(self, copy_obj = ?)
 
@@ -48,9 +48,6 @@ cdef class FitnessCriticSystem(BaseSystem):
 
     cpdef list current_trajectory(self)
     # type: (...) -> Sequence[ExperienceDatum]
-
-    cpdef list _current_trajectory(self)
-    # type: (...) -> List[ExperienceDatum]
 
     @cython.locals(trajectory = list)
     cpdef void _set_current_trajectory(

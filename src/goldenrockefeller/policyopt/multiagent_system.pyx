@@ -27,10 +27,10 @@ cdef class MultiagentSystem(BaseSystem):
             new_system = copy_obj
 
         # Deep copy.
-        new_system.__agent_systems  = [None] * len(self.__agent_systems)
-        for agent_id in range(len(self.__agent_systems)):
-            agent_system = self.__agent_systems[agent_id]
-            new_system.__agent_systems[agent_id] = agent_system.copy()
+        new_system._agent_systems  = [None] * len(self._agent_systems)
+        for agent_id in range(len(self._agent_systems)):
+            agent_system = self._agent_systems[agent_id]
+            new_system._agent_systems[agent_id] = agent_system.copy()
 
         return new_system
 
@@ -124,11 +124,11 @@ cdef class MultiagentSystem(BaseSystem):
 
     cpdef list agent_systems(self):
         # type: (...) -> List[T]
-        return self.__agent_systems
+        return self._agent_systems
 
     @cython.locals(agent_systems = list)
     cpdef void set_agent_systems(self, agent_systems: List[T]) except *:
-        self.__agent_systems = agent_systems
+        self._agent_systems = agent_systems
 
 @cython.warn.undeclared(True)
 cdef MultiagentSystem new_MultiagentSystem():
@@ -144,4 +144,4 @@ cdef void init_MultiagentSystem(MultiagentSystem system) except *:
     if system is None:
         raise TypeError("The system (system) cannot be None.")
 
-    system.__agent_systems = []
+    system._agent_systems = []

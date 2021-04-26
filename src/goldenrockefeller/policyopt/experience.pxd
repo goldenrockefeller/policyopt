@@ -3,7 +3,7 @@ cdef class ExperienceDatum:
     cdef public object action
     cdef public double reward
     # TODO add a "cdef object feedback" member for extra flexbility.
-    # TODO cont'd: replace "reward" with "feedback" if computation cheap
+    # TODO cont'd: replace "double reward" with "object feedback" if computation cheap
 
     cpdef ExperienceDatum copy(self, copy_obj = ?)
 
