@@ -17,27 +17,27 @@ cdef class BaseFunctionApproximator(BaseMap):
 
     @cython.locals(entries = list)
     cpdef void batch_update(self, entries: Sequence[TargetEntry]) except *
-
-
-cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
-    cdef BaseDifferentiableMap __super_map
-    cdef double __learning_rate
-
-    cpdef DifferentiableFunctionApproximator copy(self, copy_obj = ?)
-
-    cpdef BaseDifferentiableMap super_map(self)
-    cpdef void set_super_map(self, BaseDifferentiableMap map) except *
-
-    cpdef double learning_rate(self) except *
-    cpdef void set_learning_rate(self, double learning_rate) except *
-
-cdef DifferentiableFunctionApproximator new_DifferentiableFunctionApproximator(
-    BaseDifferentiableMap super_map)
-
-cdef void init_DifferentiableFunctionApproximator(
-    DifferentiableFunctionApproximator approximator,
-    BaseDifferentiableMap super_map
-    ) except *
+#
+#
+# cdef class DifferentiableFunctionApproximator(BaseFunctionApproximator):
+#     cdef BaseDifferentiableMap __super_map
+#     cdef double __learning_rate
+#
+#     cpdef DifferentiableFunctionApproximator copy(self, copy_obj = ?)
+#
+#     cpdef BaseDifferentiableMap super_map(self)
+#     cpdef void set_super_map(self, BaseDifferentiableMap map) except *
+#
+#     cpdef double learning_rate(self) except *
+#     cpdef void set_learning_rate(self, double learning_rate) except *
+#
+# cdef DifferentiableFunctionApproximator new_DifferentiableFunctionApproximator(
+#     BaseDifferentiableMap super_map)
+#
+# cdef void init_DifferentiableFunctionApproximator(
+#     DifferentiableFunctionApproximator approximator,
+#     BaseDifferentiableMap super_map
+#     ) except *
 #
 # cdef class RobustFunctionApproximator(DifferentiableFunctionApproximator):
 #     cdef double __line_search_shrink_rate
