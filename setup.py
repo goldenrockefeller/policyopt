@@ -2,7 +2,7 @@ from setuptools import setup
 import sys
 
 if __name__ == "__main__":
-    namespace = "rockefeg"
+    namespace = "goldenrockefeller"
     pkg = "policyopt"
     name = "{namespace}.{pkg}".format(**locals())
 
