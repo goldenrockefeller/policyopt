@@ -85,7 +85,7 @@ cdef class ShuffleBuffer():
             and (len(self.shuffled_data()) == 0) )
 
     cpdef Py_ssize_t capacity(self) except *:
-        return self.__capacity
+        return self._capacity
 
     @cython.locals(staged_data = list, new_staged_data = list)
     cpdef void set_capacity(self, Py_ssize_t capacity) except *:
