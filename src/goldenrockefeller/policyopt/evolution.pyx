@@ -297,6 +297,8 @@ cdef class BaseEvolvingSystem(BaseSystem):
             # Set the policy to the best phenotype for evaluation.
             self._set_acting_phenotype(self.best_phenotype())
             self.operate()
+
+            # An epoch/generation has passed
             self._set_n_epochs_elapsed(self.n_epochs_elapsed() + 1)
 
     cpdef void operate(self) except *:
