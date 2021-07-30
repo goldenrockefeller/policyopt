@@ -61,31 +61,31 @@ cdef class FitnessCriticSystem(BaseSystem):
 
     @cython.locals(trajectory = list, target_entries = list)
     cpdef void prep_for_epoch(self) except *:
-        cdef Py_ssize_t batch_id
-        cdef Py_ssize_t trajectory_id
-        cdef Py_ssize_t target_id
-        cdef Py_ssize_t n_trajectories_per_batch
-        cdef Py_ssize_t n_batches
-        cdef Py_ssize_t batch_size
-        cdef ShuffleBuffer trajectory_buffer
-        cdef ShuffleBuffer critic_target_buffer
-        # cdef BaseValueTargetSetter value_target_setter
-        trajectory: List[ExperienceDatum]
-        target_entries: List[TargetEntry]
-        cdef TargetEntry target_entry
-        cdef BaseFunctionApproximator intermediate_critic
-        cdef ExperienceDatum experience
-
-        n_batches = (
-            self.n_critic_update_batches_per_epoch())
-
-        n_trajectories_per_batch = (
-            self.n_trajectories_per_critic_update_batch())
-
-        trajectory_buffer = self.trajectory_buffer()
-        critic_target_buffer = self.critic_target_buffer()
-        batch_size = self.critic_update_batch_size()
-        intermediate_critic = self.intermediate_critic()
+        # cdef Py_ssize_t batch_id
+        # cdef Py_ssize_t trajectory_id
+        # cdef Py_ssize_t target_id
+        # cdef Py_ssize_t n_trajectories_per_batch
+        # cdef Py_ssize_t n_batches
+        # cdef Py_ssize_t batch_size
+        # cdef ShuffleBuffer trajectory_buffer
+        # cdef ShuffleBuffer critic_target_buffer
+        # # cdef BaseValueTargetSetter value_target_setter
+        # trajectory: List[ExperienceDatum]
+        # target_entries: List[TargetEntry]
+        # cdef TargetEntry target_entry
+        # cdef BaseFunctionApproximator intermediate_critic
+        # cdef ExperienceDatum experience
+        #
+        # n_batches = (
+        #     self.n_critic_update_batches_per_epoch())
+        #
+        # n_trajectories_per_batch = (
+        #     self.n_trajectories_per_critic_update_batch())
+        #
+        # trajectory_buffer = self.trajectory_buffer()
+        # critic_target_buffer = self.critic_target_buffer()
+        # batch_size = self.critic_update_batch_size()
+        # intermediate_critic = self.intermediate_critic()
 
         # value_target_setter = self.value_target_setter()
         raise NotImplementedError("This function needs a redo")
@@ -192,15 +192,13 @@ cdef class FitnessCriticSystem(BaseSystem):
 
         buffer_item_type = buffer.item_type()
 
-
-
         self._trajectory_buffer = buffer
 
-    cpdef ShuffleBuffer critic_target_buffer(self):
-        return self._critic_target_buffer
-
-    cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *:
-        self._critic_target_buffer = buffer
+    # cpdef ShuffleBuffer critic_target_buffer(self):
+    #     return self._critic_target_buffer
+    #
+    # cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *:
+    #     self._critic_target_buffer = buffer
 
     # cpdef BaseValueTargetSetter value_target_setter(self):
     #     return self._value_target_setter
@@ -235,41 +233,50 @@ cdef class FitnessCriticSystem(BaseSystem):
             ) except *:
         self._current_trajectory = trajectory
 
-    cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *:
-        return self._n_trajectories_per_critic_update_batch
+    # cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *:
+    #     return self._n_trajectories_per_critic_update_batch
 
-    cpdef void set_n_trajectories_per_critic_update_batch(
-            self,
-            Py_ssize_t n_trajectories
-            ) except *:
-        self._n_trajectories_per_critic_update_batch =  n_trajectories
-
-
-    cpdef Py_ssize_t critic_update_batch_size(self) except *:
-        return self._critic_update_batch_size
-
-    cpdef void set_critic_update_batch_size(self, Py_ssize_t size) except *:
-        self._critic_update_batch_size = size
-
-    cpdef Py_ssize_t n_critic_update_batches_per_epoch(self) except *:
-        return self._n_critic_update_batches_per_epoch
-
-    cpdef void set_n_critic_update_batches_per_epoch(
-            self,
-            Py_ssize_t n_batches
-            ) except *:
-        self._n_critic_update_batches_per_epoch = n_batches
-
-    cpdef bint redistributes_critic_target_updates(self) except *:
-        # Todo: implement this
-        return self._redistributes_critic_target_updates
-
-    cpdef void set_redistributes_critic_target_updates(
-            self,
-            bint redistributes_updates
-            ) except *:
-        self._redistributes_critic_target_updates = redistributes_updates
-
+    # cpdef void set_n_trajectories_per_critic_update_batch(
+    #         self,
+    #         Py_ssize_t n_trajectories
+    #         ) except *:
+    #     self._n_trajectories_per_critic_update_batch =  n_trajectories
+    #
+    # cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *:
+    #     return self._n_trajectories_per_critic_update_batch
+    #
+    # cpdef void set_n_trajectories_per_critic_update_batch(
+    #         self,
+    #         Py_ssize_t n_trajectories
+    #         ) except *:
+    #     self._n_trajectories_per_critic_update_batch =  n_trajectories
+    #
+    #
+    # cpdef Py_ssize_t critic_update_batch_size(self) except *:
+    #     return self._critic_update_batch_size
+    #
+    # cpdef void set_critic_update_batch_size(self, Py_ssize_t size) except *:
+    #     self._critic_update_batch_size = size
+    #
+    # cpdef Py_ssize_t n_critic_update_batches_per_epoch(self) except *:
+    #     return self._n_critic_update_batches_per_epoch
+    #
+    # cpdef void set_n_critic_update_batches_per_epoch(
+    #         self,
+    #         Py_ssize_t n_batches
+    #         ) except *:
+    #     self._n_critic_update_batches_per_epoch = n_batches
+    #
+    # cpdef bint redistributes_critic_target_updates(self) except *:
+    #     # Todo: implement this
+    #     return self._redistributes_critic_target_updates
+    #
+    # cpdef void set_redistributes_critic_target_updates(
+    #         self,
+    #         bint redistributes_updates
+    #         ) except *:
+    #     self._redistributes_critic_target_updates = redistributes_updates
+    #
 
 
 

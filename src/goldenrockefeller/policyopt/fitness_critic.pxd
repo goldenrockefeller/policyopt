@@ -10,15 +10,16 @@ cdef class FitnessCriticSystem(BaseSystem):
     cdef BaseSystem _super_system
     cdef BaseFunctionApproximator _intermediate_critic
     cdef ShuffleBuffer _trajectory_buffer
-    cdef ShuffleBuffer _critic_target_buffer
+    # cdef ShuffleBuffer _critic_target_buffer
     # cdef BaseValueTargetSetter _value_target_setter
     cdef _current_observation
     cdef _current_action
     cdef list _current_trajectory
-    cdef Py_ssize_t _n_trajectories_per_critic_update_batch
-    cdef Py_ssize_t _critic_update_batch_size
-    cdef Py_ssize_t _n_critic_update_batches_per_epoch
-    cdef bint _redistributes_critic_target_updates
+    cdef Py_ssize_t _n_critic_updates_per_epoch
+    # cdef Py_ssize_t _n_trajectories_per_critic_update_batch
+    # cdef Py_ssize_t _critic_update_batch_size
+    # cdef Py_ssize_t _n_critic_update_batches_per_epoch
+    # cdef bint _redistributes_critic_target_updates
 
     cpdef FitnessCriticSystem copy(self, copy_obj = ?)
 
@@ -34,8 +35,8 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef ShuffleBuffer trajectory_buffer(self)
     cpdef void _set_trajectory_buffer(self, ShuffleBuffer buffer) except *
 
-    cpdef ShuffleBuffer critic_target_buffer(self)
-    cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *
+    # cpdef ShuffleBuffer critic_target_buffer(self)
+    # cpdef void _set_critic_target_buffer(self, ShuffleBuffer buffer) except *
 
     # cpdef BaseValueTargetSetter value_target_setter(self)
     # cpdef void set_value_target_setter(self, BaseValueTargetSetter value_target_setter) except *
@@ -55,26 +56,34 @@ cdef class FitnessCriticSystem(BaseSystem):
         trajectory: List[ExperienceDatum]
         ) except *
 
-    cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *
-    cpdef void set_n_trajectories_per_critic_update_batch(
-        self,
-        Py_ssize_t n_trajectories
-        ) except *
+    # cpdef Py_ssize_t n_n_critic_updates_per_epoch(self) except *
+    # cpdef void set_n_critic_updates_per_epoch(
+    #     self,
+    #     Py_ssize_t n_trajectories
+    #     ) except *
 
-    cpdef Py_ssize_t critic_update_batch_size(self) except *
-    cpdef void set_critic_update_batch_size(self, Py_ssize_t size) except *
 
-    cpdef Py_ssize_t n_critic_update_batches_per_epoch(self) except *
-    cpdef void set_n_critic_update_batches_per_epoch(
-        self,
-        Py_ssize_t n_batches
-        ) except *
-
-    cpdef bint redistributes_critic_target_updates(self) except *
-    cpdef void set_redistributes_critic_target_updates(
-        self,
-        bint redistributes_updates
-        ) except *
+    #
+    # cpdef Py_ssize_t n_trajectories_per_critic_update_batch(self) except *
+    # cpdef void set_n_trajectories_per_critic_update_batch(
+    #     self,
+    #     Py_ssize_t n_trajectories
+    #     ) except *
+    #
+    # cpdef Py_ssize_t critic_update_batch_size(self) except *
+    # cpdef void set_critic_update_batch_size(self, Py_ssize_t size) except *
+    #
+    # cpdef Py_ssize_t n_critic_update_batches_per_epoch(self) except *
+    # cpdef void set_n_critic_update_batches_per_epoch(
+    #     self,
+    #     Py_ssize_t n_batches
+    #     ) except *
+    #
+    # cpdef bint redistributes_critic_target_updates(self) except *
+    # cpdef void set_redistributes_critic_target_updates(
+    #     self,
+    #     bint redistributes_updates
+    #     ) except *
 
 
 cdef FitnessCriticSystem new_FitnessCriticSystem(
