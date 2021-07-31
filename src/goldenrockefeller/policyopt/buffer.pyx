@@ -67,9 +67,10 @@ cdef class ShuffleBuffer():
                     "(self.is_empty() = True)" ))
 
         # TODO .shuffle() can be optimized
-        new_shuffled_data =  self.staged_data().copy()
-        np.random.shuffle(new_shuffled_data)
-        self._set_shuffled_data(new_shuffled_data)
+        if len(self._shuffled_data) == 0:
+            new_shuffled_data =  self.staged_data().copy()
+            np.random.shuffle(new_shuffled_data)
+            self._set_shuffled_data(new_shuffled_data)
 
         return self._shuffled_data.pop()
 

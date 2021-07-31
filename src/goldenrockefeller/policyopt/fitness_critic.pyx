@@ -312,13 +312,13 @@ cdef void init_FitnessCriticSystem(
     system._super_system = super_system
     system._intermediate_critic = intermediate_critic
     system._trajectory_buffer = new_ShuffleBuffer()
-    system._critic_target_buffer = new_ShuffleBuffer()
+    # system._critic_target_buffer = new_ShuffleBuffer()
     system._current_observation = None
     system._current_action = None
     system._current_trajectory = []
-    system._critic_update_batch_size = 1
-    system._n_trajectories_per_critic_update_batch = 1
-    system._n_critic_update_batches_per_epoch = 1
-    system._redistributes_critic_target_updates = False
+    # system._critic_update_batch_size = 1
+    # system._n_trajectories_per_critic_update_batch = 1
+    # system._n_critic_update_batches_per_epoch = 1
+    # system._redistributes_critic_target_updates = False
     # system._value_target_setter = new_TotalRewardTargetSetter()
 
