@@ -4,10 +4,11 @@ import cython
 # from .value_target cimport new_TotalRewardTargetSetter
 from .buffer cimport new_ShuffleBuffer
 from .experience cimport ExperienceDatum, new_ExperienceDatum
-from .function_approximation cimport TargetEntry
+from .function_approximation cimport TargetEntry, new_TargetEntry
 from goldenrockefeller.cyutil.array cimport DoubleArray
+import sys
 
-from libc.math cimport isfinite
+# from libc.math cimport isfinite
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -59,59 +60,63 @@ cdef class FitnessCriticSystem(BaseSystem):
     cpdef bint is_done_training(self) except *:
         return self.super_system().is_done_training()
 
-    @cython.locals(trajectory = list, target_entries = list)
-    cpdef void prep_for_epoch(self) except *:
-        # cdef Py_ssize_t batch_id
-        # cdef Py_ssize_t trajectory_id
-        # cdef Py_ssize_t target_id
-        # cdef Py_ssize_t n_trajectories_per_batch
-        # cdef Py_ssize_t n_batches
-        # cdef Py_ssize_t batch_size
-        # cdef ShuffleBuffer trajectory_buffer
-        # cdef ShuffleBuffer critic_target_buffer
-        # # cdef BaseValueTargetSetter value_target_setter
-        # trajectory: List[ExperienceDatum]
-        # target_entries: List[TargetEntry]
-        # cdef TargetEntry target_entry
-        # cdef BaseFunctionApproximator intermediate_critic
-        # cdef ExperienceDatum experience
-        #
-        # n_batches = (
-        #     self.n_critic_update_batches_per_epoch())
-        #
-        # n_trajectories_per_batch = (
-        #     self.n_trajectories_per_critic_update_batch())
-        #
-        # trajectory_buffer = self.trajectory_buffer()
-        # critic_target_buffer = self.critic_target_buffer()
-        # batch_size = self.critic_update_batch_size()
-        # intermediate_critic = self.intermediate_critic()
-
-        # value_target_setter = self.value_target_setter()
-        raise NotImplementedError("This function needs a redo")
-
-        # if not trajectory_buffer.is_empty():
-        #     for batch_id in range(n_batches):
-        #         for trajectory_id in range(n_trajectories_per_batch):
-        #             trajectory = trajectory_buffer.next_shuffled_datum()
-        #             target_entries = (
-        #                 value_target_setter.value_target_entries(
-        #                     trajectory))
-        #             for target_entry in target_entries:
-        #                 critic_target_buffer.add_staged_datum(target_entry)
-        #
-        #
-        #         target_entries = [None] * batch_size
-        #
-        #         for target_id in range(batch_size):
-        #             target_entry = critic_target_buffer.next_shuffled_datum()
-        #             target_entries[target_id] = target_entry
-        #
-        #         intermediate_critic.batch_update(target_entries)
-        #     raise NotImplementedError("This function needs a redo")
-        #     print(intermediate_critic.eval(trajectory[0]).view[0])
-        #
-        # self.super_system().prep_for_epoch()
+    #
+    #
+    # @cython.locals(trajectory = list, target_entries = list)
+    # cpdef void prep_for_epoch(self) except *:
+    #     cdef Py_ssize_t batch_id
+    #     cdef Py_ssize_t trajectory_id
+    #     cdef Py_ssize_t target_id
+    #     cdef Py_ssize_t n_trajectories_per_batch
+    #     cdef Py_ssize_t n_batches
+    #     cdef Py_ssize_t batch_size
+    #     cdef ShuffleBuffer trajectory_buffer
+    #     cdef ShuffleBuffer critic_target_buffer
+    #     # cdef BaseValueTargetSetter value_target_setter
+    #     trajectory: List[ExperienceDatum]
+    #     target_entries: List[TargetEntry]
+    #     cdef TargetEntry target_entry
+    #     cdef BaseFunctionApproximator intermediate_critic
+    #     cdef ExperienceDatum experience
+    #     #
+    #     # n_batches = (
+    #     #     self.n_critic_update_batches_per_epoch())
+    #     #
+    #     # n_trajectories_per_batch = (
+    #     #     self.n_trajectories_per_critic_update_batch())
+    #     #
+    #     trajectory_buffer = self.trajectory_buffer()
+    #     # critic_target_buffer = self.critic_target_buffer()
+    #     # batch_size = self.critic_update_batch_size()
+    #     # intermediate_critic = self.intermediate_critic()
+    #
+    #     # value_target_setter = self.value_target_setter()
+    #     raise NotImplementedError("This function needs a redo")
+    #
+    #     if not trajectory_buffer.is_empty():
+    #         for update_id in range(self._n_critic_updates_per_epoch):
+    #             trajectory = trajectory_buffer.next_shuffled_datum()
+    #     #     for batch_id in range(n_batches):
+    #     #         for trajectory_id in range(n_trajectories_per_batch):
+    #     #             trajectory = trajectory_buffer.next_shuffled_datum()
+    #     #             target_entries = (
+    #     #                 value_target_setter.value_target_entries(
+    #     #                     trajectory))
+    #     #             for target_entry in target_entries:
+    #     #                 critic_target_buffer.add_staged_datum(target_entry)
+    #     #
+    #     #
+    #     #         target_entries = [None] * batch_size
+    #     #
+    #     #         for target_id in range(batch_size):
+    #     #             target_entry = critic_target_buffer.next_shuffled_datum()
+    #     #             target_entries[target_id] = target_entry
+    #     #
+    #     #         intermediate_critic.batch_update(target_entries)
+    #     #     raise NotImplementedError("This function needs a redo")
+    #     #     print(intermediate_critic.eval(trajectory[0]).view[0])
+    #     #
+    #     # self.super_system().prep_for_epoch()
 
     cpdef bint is_ready_for_evaluation(self) except *:
         cdef BaseSystem system
@@ -151,8 +156,8 @@ cdef class FitnessCriticSystem(BaseSystem):
         new_feedback = intermediate_eval.view[0]
 
 
-        if not isfinite(new_feedback):
-            raise RuntimeError("Something went wrong: feedback is not finite.")
+        # if not isfinite(new_feedback):
+        #     raise RuntimeError("Something went wrong: feedback is not finite.")
 
         self.super_system().receive_feedback(new_feedback)
 
@@ -278,6 +283,105 @@ cdef class FitnessCriticSystem(BaseSystem):
     #     self._redistributes_critic_target_updates = redistributes_updates
     #
 
+cdef class TestFitnessCriticSystem(FitnessCriticSystem):
+    cdef public Py_ssize_t n_critic_updates_per_epoch
+    cdef public ShuffleBuffer experience_target_buffer
+    cdef public Py_ssize_t uses_experience_targets_for_updates
+
+    def __init__(
+            self,
+            BaseSystem super_system,
+            BaseFunctionApproximator intermediate_critic):
+        init_FitnessCriticSystem(self, super_system, intermediate_critic)
+        self.n_critic_updates_per_epoch = 1
+        self.experience_target_buffer = new_ShuffleBuffer()
+
+
+    #step_wise feedback
+    cpdef void receive_feedback(self, feedback) except *:
+        cdef ExperienceDatum experience
+        cdef double new_feedback
+        cdef BaseFunctionApproximator intermediate_critic
+        cdef list current_trajectory
+
+        intermediate_critic = self.intermediate_critic()
+
+        experience = new_ExperienceDatum()
+        experience.observation = self.current_observation()
+        experience.action = self.current_action()
+        experience.reward = feedback
+
+        self.current_trajectory().append(experience)
+
+        new_feedback = intermediate_critic.eval(experience).view[0]
+        #
+        #
+        # # if not isfinite(new_feedback):
+        # #     raise RuntimeError("Something went wrong: feedback is not finite.")
+        #
+        self.super_system().receive_feedback(new_feedback)
+
+    cpdef void update_policy(self) except *:
+        cdef list current_trajectory = self.current_trajectory()
+        FitnessCriticSystem.update_policy(self)
+
+        if self.uses_experience_targets_for_updates:
+            self.extract_experience_targets(current_trajectory)
+
+    cpdef void extract_experience_targets(self, list trajectory) except *:
+        cdef ExperienceDatum experience
+        cdef double traj_eval
+        cdef double step_eval
+        cdef double sample_fitness
+        cdef BaseFunctionApproximator intermediate_critic  = self.intermediate_critic()
+        cdef double error
+        cdef TargetEntry target_entry
+        cdef Py_ssize_t traj_len = len(trajectory)
+
+        sample_fitness = 0.
+        traj_eval = 0.
+
+        for experience in trajectory:
+            sample_fitness += experience.reward
+            traj_eval += intermediate_critic.eval(experience).view[0]
+
+        traj_eval /= traj_len
+
+        error = sample_fitness - traj_eval
+
+        for experience in trajectory:
+            step_eval = intermediate_critic.eval(experience).view[0]
+            target_entry = new_TargetEntry()
+            target_entry.input = experience
+            target_entry.target = error + step_eval
+            self.experience_target_buffer.add_staged_datum(target_entry)
+
+
+    cpdef void prep_for_epoch(self) except *:
+        cdef Py_ssize_t update_id
+        cdef BaseSystem system
+        cdef BaseFunctionApproximator intermediate_critic = self.intermediate_critic()
+        cdef list trajectory
+        cdef Py_ssize_t n_updates = self.n_critic_updates_per_epoch
+        cdef TargetEntry target_entry
+
+
+        if not self._trajectory_buffer.is_empty():
+            for update_id in range(n_updates):
+                if self.uses_experience_targets_for_updates:
+                    target_entry = self.experience_target_buffer.next_shuffled_datum()
+                    intermediate_critic.batch_update([target_entry])
+                else:
+                    trajectory = self._trajectory_buffer.next_shuffled_datum()
+                    raise RuntimeError("Not implemented")
+
+            # raise ValueError()
+            print(intermediate_critic.eval(target_entry.input).view[0])
+            sys.stdout.flush()
+            # raise ValueError()
+            # print(len(trajectory))
+        system = self.super_system()
+        system.prep_for_epoch()
 
 
 @cython.warn.undeclared(True)
