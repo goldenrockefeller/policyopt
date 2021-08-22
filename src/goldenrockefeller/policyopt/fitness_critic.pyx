@@ -8,7 +8,7 @@ from .function_approximation cimport TargetEntry, new_TargetEntry
 from goldenrockefeller.cyutil.array cimport DoubleArray
 import sys
 
-# from libc.math cimport isfinite
+from libc.math cimport isfinite
 
 @cython.warn.undeclared(True)
 @cython.auto_pickle(True)
@@ -156,8 +156,8 @@ cdef class FitnessCriticSystem(BaseSystem):
         new_feedback = intermediate_eval.view[0]
 
 
-        # if not isfinite(new_feedback):
-        #     raise RuntimeError("Something went wrong: feedback is not finite.")
+        if not isfinite(new_feedback):
+            raise RuntimeError("Something went wrong: feedback is not finite.")
 
         self.super_system().receive_feedback(new_feedback)
 
